@@ -1,0 +1,8 @@
+.DS_Store
+.build/
+build/
+work/
+*.log
+*.pid
+DerivedData/
+Package.resolved
