@@ -10,21 +10,21 @@ ARTIFACT_ZIP=""
 case "$TARGET" in
   arm64)
     BUILD_ROOT=".build/arm64-app"
-    BIN_DIR="$BUILD_ROOT/arm64-apple-macosx/release"
+    BIN_DIR="$BUILD_ROOT/out/Products/Release"
     APP_DIR="build/DesktopDestruction-Apple-Silicon.app"
     ARTIFACT_ZIP="artifacts/DesktopDestruction-Apple-Silicon.zip"
     swift build -c release --arch arm64 --build-path "$BUILD_ROOT"
     ;;
   x86_64)
     BUILD_ROOT=".build/x86_64-app"
-    BIN_DIR="$BUILD_ROOT/x86_64-apple-macosx/release"
+    BIN_DIR="$BUILD_ROOT/out/Products/Release"
     APP_DIR="build/DesktopDestruction-Intel-x86_64.app"
     ARTIFACT_ZIP="artifacts/DesktopDestruction-Intel-x86_64.zip"
     swift build -c release --arch x86_64 --build-path "$BUILD_ROOT"
     ;;
   universal)
     BUILD_ROOT=".build/universal-app"
-    BIN_DIR="$BUILD_ROOT/apple/Products/Release"
+    BIN_DIR="$BUILD_ROOT/out/Products/Release"
     APP_DIR="build/DesktopDestruction-Universal.app"
     swift build -c release --arch arm64 --arch x86_64 --build-path "$BUILD_ROOT"
     ;;
@@ -65,8 +65,8 @@ cat > "$STAGING_APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleIdentifier</key><string>com.codex.desktopdestruction</string>
   <key>CFBundleName</key><string>DesktopDestruction</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.3.0</string>
-  <key>CFBundleVersion</key><string>4</string>
+  <key>CFBundleShortVersionString</key><string>1.4.0</string>
+  <key>CFBundleVersion</key><string>5</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>

@@ -67,6 +67,8 @@ struct AnimalSpecies {
         .species("🐪", .grazeWalk, speed: 82, bodySize: 96, biteRadius: 12),
         .species("🐫", .grazeWalk, speed: 84, bodySize: 98, biteRadius: 12),
         .species("🦒", .grazeWalk, speed: 92, bodySize: 112, biteRadius: 13),
+        .species("🦓", .run, speed: 148, bodySize: 90, biteRadius: 10, trail: .paw),
+        .species("🦭", .swim, speed: 86, bodySize: 88, biteRadius: 12, trail: .bubble),
         .species("🦘", .hop, speed: 146, bodySize: 92, biteRadius: 11, trail: .paw),
         .species("🐃", .charge, speed: 118, bodySize: 102, biteRadius: 14, trail: .paw),
         .species("🐂", .charge, speed: 124, bodySize: 100, biteRadius: 14, trail: .paw),

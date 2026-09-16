@@ -47,7 +47,17 @@ DD_CAPTURE_DESKTOP=1 ./build/DesktopDestruction.app/Contents/MacOS/DesktopDestru
 
 ## 美术资源
 
-内置的漫画风工具图标和特效贴图位于 `Sources/DesktopDestruction/Resources/Art`。如需调整配色或造型，可以修改 `scripts/generate_art.py` 后重新生成：
+固定小人、常见动物和僵尸优先使用 Kenney 的 CC0 漫画贴图；Kenney 没覆盖的固定动物会回退到内置 OpenMoji，仍缺失时才使用系统 emoji。任意 emoji 模式优先使用内置 OpenMoji。火焰、烟、火花、枪口光、碎屑和爆炸来自 Kenney Particle Pack 与 OpenGameArt 的 CC0 素材。顶部工具栏、轮盘和鼠标指针使用系统 emoji；蘑菇云、裂纹和血迹仍使用项目内的漫画风定制绘制。
+
+外部素材来源与授权见 `THIRD_PARTY_LICENSES.md`。可用以下命令重新拉取：
+
+```bash
+python3 scripts/fetch_external_art.py
+```
+
+脚本会安装 OpenMoji、Kenney CC0 粒子与角色贴图，以及 OpenGameArt 的 CC0 爆炸贴图。
+
+内置的漫画风特效贴图位于 `Sources/DesktopDestruction/Resources/Art`；外部资源同名贴图由 `fetch_external_art.py` 管理。如需调整其余定制贴图，可以修改 `scripts/generate_art.py` 后重新生成：
 
 ```bash
 python3 scripts/generate_art.py Sources/DesktopDestruction/Resources/Art
@@ -76,7 +86,7 @@ python3 scripts/generate_art.py Sources/DesktopDestruction/Resources/Art
 
 ## 生物与核爆
 
-- 僵尸会追咬普通人和动物，被咬者会变成僵尸；僵尸移速更慢、会聚群，每 3 个同阶僵尸融合成更高阶巨型僵尸，血量和破坏力递增，且没有阶数上限。
+- 僵尸会追咬普通人和动物，被咬者会变成僵尸；僵尸移速更慢、会聚群，每 2 个同阶僵尸融合成更高阶巨型僵尸，体型、血量和破坏力持续递增，且没有阶数上限。
 - 动物会咬人和其他动物，进食后逐渐变大、变快、咬合范围变大。
 - 小人包含更多女性和深肤色角色，并保留跑步、跳舞、太空漫步、英雄冲刺等差异化移动。
 - 大型僵尸可以撞毁围墙、引爆车辆并碾压虫子、植物和其他非僵尸 actor。

@@ -733,14 +733,8 @@ ASSETS: dict[str, Callable[[Art], None]] = {
     "ui-restore": draw_restore,
     "ui-settings": draw_settings,
     "ui-exit": draw_exit,
-    "effect-explosion": draw_explosion,
-    "effect-fire": draw_fire,
-    "effect-smoke": draw_smoke,
-    "effect-spark": draw_spark,
-    "effect-debris": draw_debris,
     "effect-glass-shard": draw_glass_shard,
     "effect-water-drop": draw_water_drop,
-    "effect-muzzle-flash": draw_muzzle_flash,
     "effect-shockwave": draw_shockwave,
     "effect-mushroom-cloud": draw_mushroom_cloud,
     "effect-blood-splat": draw_blood_splat,
@@ -759,8 +753,6 @@ ASSETS: dict[str, Callable[[Art], None]] = {
 
 ASSET_SIZES: dict[str, tuple[int, int]] = {
     "wall-brick": (512, 88),
-    "effect-explosion": (512, 512),
-    "effect-fire": (512, 512),
     "effect-shockwave": (512, 512),
     "effect-mushroom-cloud": (512, 512),
     "creature-giant-zombie": (512, 512),

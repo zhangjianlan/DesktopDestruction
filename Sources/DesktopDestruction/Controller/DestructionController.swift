@@ -241,7 +241,7 @@ final class DestructionController {
     }
 
     private func updateCursor(for tool: Tool) {
-        cursorLayer.contents = ArtAssets.image(named: tool.cursorAssetName)
+        cursorLayer.contents = IconRenderer.emoji(tool.cursorEmoji, size: 38)
     }
 
     private func clampedCursorBadgePoint(for point: CGPoint) -> CGPoint {
@@ -529,11 +529,7 @@ final class DestructionController {
     private func eraseCreatures(at point: CGPoint, radius: CGFloat) {
         let hitCreatures = creatures.filter { $0.hitTest(point, radius: radius) }
         for creature in hitCreatures {
-            if creature.kind.isVehicle {
-                creature.discard()
-            } else {
-                creature.kill(canvas: canvas)
-            }
+            creature.discard()
         }
         creatures.removeAll { !$0.isAlive }
     }
@@ -993,21 +989,23 @@ final class DestructionController {
                     vehicleCollisionPairs.append((vehicle, other))
                     hadCollision = true
                 } else {
-                    other.kill(canvas: canvas)
+                    let died = other.kill(canvas: canvas)
                     hadCollision = true
-                    let contact = CGPoint(
-                        x: (vehicle.currentPosition.x + other.currentPosition.x) / 2,
-                        y: (vehicle.currentPosition.y + other.currentPosition.y) / 2
-                    )
-                    if let damage = DamageRenderer.renderGouge(
-                        at: contact,
-                        angle: CGFloat.random(in: 0...(2 * .pi)),
-                        radius: 24
-                    ) {
-                        canvas.addDamage(image: damage.0, frame: damage.1)
+                    if died {
+                        let contact = CGPoint(
+                            x: (vehicle.currentPosition.x + other.currentPosition.x) / 2,
+                            y: (vehicle.currentPosition.y + other.currentPosition.y) / 2
+                        )
+                        if let damage = DamageRenderer.renderGouge(
+                            at: contact,
+                            angle: CGFloat.random(in: 0...(2 * .pi)),
+                            radius: 24
+                        ) {
+                            canvas.addDamage(image: damage.0, frame: damage.1)
+                        }
+                        ParticleFactory.dust(at: contact, count: 8, in: canvas)
+                        AudioManager.shared.play("punch_hit", gain: 0.48, rate: 1.4)
                     }
-                    ParticleFactory.dust(at: contact, count: 8, in: canvas)
-                    AudioManager.shared.play("punch_hit", gain: 0.48, rate: 1.4)
                 }
             }
         }
@@ -1135,20 +1133,21 @@ final class DestructionController {
                 ParticleFactory.dust(at: target.currentPosition, count: 5, in: canvas)
                 AudioManager.shared.play("switch_click", gain: 0.22, rate: 0.55)
             } else if creature.kind.isAnimal {
-                target.kill(canvas: canvas)
-                creature.evolve()
-                addCreatureEffect(
-                    named: "effect-evolution",
-                    at: creature.currentPosition,
-                    size: max(62, creature.traits.bodySize * 1.1)
-                )
-                ParticleFactory.dust(at: creature.currentPosition, count: 9, in: canvas)
-                if let damage = DamageRenderer.renderChewMarks(
-                    at: target.currentPosition,
-                    radius: creature.traits.biteRadius,
-                    shape: creature.traits.biteShape
-                ) {
-                    canvas.addDamage(image: damage.0, frame: damage.1)
+                if target.kill(canvas: canvas) {
+                    creature.evolve()
+                    addCreatureEffect(
+                        named: "effect-evolution",
+                        at: creature.currentPosition,
+                        size: max(62, creature.traits.bodySize * 1.1)
+                    )
+                    ParticleFactory.dust(at: creature.currentPosition, count: 9, in: canvas)
+                    if let damage = DamageRenderer.renderChewMarks(
+                        at: target.currentPosition,
+                        radius: creature.traits.biteRadius,
+                        shape: creature.traits.biteShape
+                    ) {
+                        canvas.addDamage(image: damage.0, frame: damage.1)
+                    }
                 }
             }
         }
@@ -1161,8 +1160,8 @@ final class DestructionController {
 
         for tier in 1...max(1, maximumTier) {
             var sameTierZombies = creatures.filter { $0.isZombie && $0.zombieTier == tier }
-            while sameTierZombies.count >= 3 {
-                let merging = Array(sameTierZombies.prefix(3))
+            while sameTierZombies.count >= 2 {
+                let merging = Array(sameTierZombies.prefix(2))
                 let survivor = merging[0]
                 for zombie in merging.dropFirst() {
                     zombie.discard()

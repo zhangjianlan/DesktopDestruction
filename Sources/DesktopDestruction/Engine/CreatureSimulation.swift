@@ -607,10 +607,13 @@ final class CreatureActor {
     let id = UUID()
     let kind: CreatureKind
     let layer = CALayer()
+    private let createdAt = Date()
     private(set) var traits: CreatureTraits
     private(set) var isAlive = true
     private(set) var zombieTier = 0
     private(set) var evolutionStage = 0
+    private(set) var survivalTier = 0
+    private(set) var remainingDeathSaves = 0
     private var maximumHealth: CGFloat = 1
     private var currentHealth: CGFloat = 1
     private var panicUntil: Date?
@@ -636,6 +639,7 @@ final class CreatureActor {
     private var burnEmitter: CAEmitterLayer?
     private var burnStartedAt: Date?
     private var burnDuration: TimeInterval = 0
+    private let shieldLayer = CAShapeLayer()
 
     var isBurning: Bool {
         burnStartedAt != nil
@@ -660,10 +664,12 @@ final class CreatureActor {
         navigationPhaseOffset = Self.nextNavigationValue(&state) * 2 * .pi
         navigationState = state
         layer.bounds = CGRect(x: 0, y: 0, width: traits.bodySize, height: traits.bodySize)
-        layer.contents = IconRenderer.emoji(kindEmoji, size: traits.bodySize * 0.82)
+        layer.contentsGravity = .resizeAspect
+        layer.contents = creatureImage
         layer.contentsScale = 2
         layer.position = point
         layer.zPosition = kind.isVehicle ? 78 : (kind.isAnimal ? 76 : (kind.isPerson ? 73 : 72))
+        configureShieldLayer()
         maximumHealth = initialHealth
         currentHealth = maximumHealth
         if case .person(.zombie) = kind {
@@ -682,6 +688,31 @@ final class CreatureActor {
         case .vehicle(let species): return species.emoji
         case .anything(let species): return species.emoji
         }
+    }
+
+    private var fixedCharacterSpriteName: String? {
+        if isZombie {
+            return CharacterSprites.zombie(tier: zombieTier)
+        }
+        switch kind {
+        case .animal(let species):
+            return CharacterSprites.animal(for: species.emoji)
+        case .person(let species):
+            return CharacterSprites.person(for: species)
+        case .insect, .vehicle, .anything:
+            return nil
+        }
+    }
+
+    private var fixedCharacterImage: CGImage? {
+        fixedCharacterSpriteName.flatMap { ArtAssets.character(named: $0) }
+    }
+
+    private var creatureImage: CGImage? {
+        fixedCharacterImage ?? ArtAssets.openMoji(kindEmoji) ?? IconRenderer.emoji(
+            kindEmoji,
+            size: traits.bodySize * 0.82
+        )
     }
 
     var isZombie: Bool {
@@ -732,6 +763,9 @@ final class CreatureActor {
     func infect() {
         guard isAlive, canInfect, !isZombie else { return }
         zombieTier = 1
+        survivalTier = 0
+        remainingDeathSaves = 0
+        removeShield()
         applyZombieTraits()
     }
 
@@ -744,33 +778,39 @@ final class CreatureActor {
     func evolve() {
         guard isAlive, kind.isAnimal, !isZombie, evolutionStage < 8 else { return }
         evolutionStage += 1
+        rebuildAnimalTraits()
+        updateAppearance()
+    }
+
+    private func rebuildAnimalTraits() {
         let growth = CGFloat(pow(1.13, Double(evolutionStage)))
+        let sizeGrowth = growth * (1 + CGFloat(survivalTier) * (baseTraits.bodySize >= 100 ? 0.035 : 0.05))
+        let reachGrowth = growth * (1 + CGFloat(survivalTier) * 0.07)
         traits = CreatureTraits(
             speed: min(260, baseTraits.speed * (1 + CGFloat(evolutionStage) * 0.09)),
             turnInterval: baseTraits.turnInterval,
             turnJitter: baseTraits.turnJitter,
             biteInterval: max(0.42, baseTraits.biteInterval * 0.9),
-            biteRadius: min(34, baseTraits.biteRadius * growth),
+            biteRadius: min(44, baseTraits.biteRadius * reachGrowth),
             biteShape: baseTraits.biteShape,
-            hitRadius: min(145, baseTraits.hitRadius * growth),
-            bodySize: min(230, baseTraits.bodySize * growth),
+            hitRadius: min(175, baseTraits.hitRadius * sizeGrowth),
+            bodySize: min(260, baseTraits.bodySize * sizeGrowth),
             movement: baseTraits.movement,
-            deathRadius: min(145, baseTraits.deathRadius * growth),
+            deathRadius: min(175, baseTraits.deathRadius * sizeGrowth),
             leavesTrail: baseTraits.leavesTrail,
             explosionRadius: baseTraits.explosionRadius,
             deathEffect: baseTraits.deathEffect
         )
-        maximumHealth = max(3, traits.bodySize / 26)
+        maximumHealth = max(3, traits.bodySize / 26 * (1 + CGFloat(survivalTier) * 0.16))
         currentHealth = maximumHealth
-        updateAppearance()
     }
 
     private func applyZombieTraits() {
         let tier = max(1, zombieTier)
         let growth = CGFloat(pow(1.42, Double(tier - 1)))
-        let bodySize = min(680, max(64, baseTraits.bodySize * 0.98 * growth))
-        let hitRadius = min(310, bodySize * 0.58)
-        let biteRadius = min(82, max(12, baseTraits.biteRadius * growth * 1.3))
+        let bodySize = max(64, baseTraits.bodySize * 0.98 * growth)
+        let hitRadius = bodySize * 0.58
+        let biteRadius = max(12, baseTraits.biteRadius * growth * 1.3)
         traits = CreatureTraits(
             speed: max(9, 27 / (1 + CGFloat(tier - 1) * 0.1)),
             turnInterval: 0.85,
@@ -781,7 +821,7 @@ final class CreatureActor {
             hitRadius: hitRadius,
             bodySize: bodySize,
             movement: .chase,
-            deathRadius: min(350, bodySize * 1.15),
+            deathRadius: bodySize * 1.15,
             leavesTrail: nil,
             explosionRadius: 0,
             deathEffect: .blood
@@ -791,17 +831,165 @@ final class CreatureActor {
         updateAppearance()
     }
 
+    private var canGrowBySurvival: Bool {
+        (kind.isPerson || kind.isAnimal) && !isZombie
+    }
+
+    private var survivalSpeedMultiplier: CGFloat {
+        guard canGrowBySurvival else { return 1 }
+        if kind.isPerson {
+            return 1 + CGFloat(max(0, survivalTier - 1)) * 0.18
+        }
+
+        let perTierBonus: CGFloat
+        switch baseTraits.movement {
+        case .soar, .flutter:
+            perTierBonus = 0.16
+        case .run, .pounce, .charge, .gallop:
+            perTierBonus = 0.14
+        case .swim:
+            perTierBonus = 0.12
+        case .lumber:
+            perTierBonus = 0.06
+        default:
+            perTierBonus = 0.09
+        }
+        return 1 + CGFloat(survivalTier) * perTierBonus
+    }
+
+    private func updateSurvivalTier(now: Date) {
+        guard canGrowBySurvival else { return }
+        let interval: TimeInterval = kind.isPerson ? 20 : 15
+        let targetTier = min(8, Int(now.timeIntervalSince(createdAt) / interval))
+        guard targetTier > survivalTier else { return }
+
+        survivalTier = targetTier
+        remainingDeathSaves = min(8, max(remainingDeathSaves + 1, survivalTier))
+        if kind.isAnimal {
+            rebuildAnimalTraits()
+            updateAppearance()
+        } else {
+            updateShieldAppearance(animated: true)
+        }
+        playSurvivalSound()
+    }
+
+    private func configureShieldLayer() {
+        guard kind.isPerson || kind.isAnimal else { return }
+        shieldLayer.fillColor = CGColor(
+            red: 0.22,
+            green: 0.62,
+            blue: 1,
+            alpha: 0.06
+        )
+        shieldLayer.strokeColor = CGColor(
+            red: 0.22,
+            green: 0.62,
+            blue: 1,
+            alpha: 0.92
+        )
+        shieldLayer.lineWidth = 4
+        shieldLayer.lineCap = .round
+        shieldLayer.isHidden = true
+        layer.addSublayer(shieldLayer)
+    }
+
+    private func updateShieldAppearance(animated: Bool = false) {
+        guard canGrowBySurvival else {
+            removeShield()
+            return
+        }
+
+        let saveCount = min(8, max(0, remainingDeathSaves))
+        guard saveCount > 0 else {
+            removeShield()
+            return
+        }
+
+        let diameter = max(
+            traits.bodySize * 1.42,
+            traits.hitRadius * 2.5
+        )
+        let radius = diameter / 2
+        let center = CGPoint(x: radius, y: radius)
+        let path = CGMutablePath()
+        for index in 0..<saveCount {
+            let start = -CGFloat.pi / 2 + CGFloat(index) * 2 * .pi / CGFloat(saveCount)
+            let end = start + (2 * .pi / CGFloat(saveCount)) * 0.68
+            path.addArc(
+                center: center,
+                radius: radius,
+                startAngle: start,
+                endAngle: end,
+                clockwise: false
+            )
+        }
+
+        let isSuperAnimal = kind.isAnimal && survivalTier >= 3
+        shieldLayer.bounds = CGRect(x: 0, y: 0, width: diameter, height: diameter)
+        shieldLayer.position = CGPoint(x: traits.bodySize / 2, y: traits.bodySize / 2)
+        shieldLayer.path = path
+        shieldLayer.lineWidth = 4 + CGFloat(min(survivalTier, 8)) * 1.1
+        shieldLayer.strokeColor = isSuperAnimal
+            ? CGColor(red: 1, green: 0.78, blue: 0.18, alpha: 0.96)
+            : (kind.isAnimal
+                ? CGColor(red: 0.35, green: 0.95, blue: 0.44, alpha: 0.92)
+                : CGColor(red: 0.22, green: 0.62, blue: 1, alpha: 0.92))
+        shieldLayer.fillColor = isSuperAnimal
+            ? CGColor(red: 1, green: 0.78, blue: 0.18, alpha: 0.09)
+            : CGColor(red: 0.22, green: 0.62, blue: 1, alpha: 0.06)
+        shieldLayer.isHidden = false
+
+        if animated {
+            let pulse = CABasicAnimation(keyPath: "transform.scale")
+            pulse.fromValue = 0.82
+            pulse.toValue = 1
+            pulse.duration = 0.32
+            pulse.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            shieldLayer.add(pulse, forKey: "survivalShieldPulse")
+        }
+    }
+
+    private func removeShield() {
+        shieldLayer.isHidden = true
+        shieldLayer.path = nil
+    }
+
+    private func playSurvivalSound() {
+        AudioManager.shared.play(
+            "restore_chime",
+            gain: 0.24,
+            rate: kind.isPerson ? 1.18 : 1.42,
+            minimumInterval: 0.08
+        )
+    }
+
+    @discardableResult
+    private func consumeDeathSave(canvas: DestructionCanvas) -> Bool {
+        guard canGrowBySurvival, remainingDeathSaves > 0 else { return false }
+        remainingDeathSaves -= 1
+        currentHealth = maximumHealth
+        extinguish()
+        updateShieldAppearance(animated: true)
+        ParticleFactory.sparks(at: position, count: 16, in: canvas)
+        AudioManager.shared.play(
+            "restore_chime",
+            gain: 0.38,
+            rate: kind.isPerson ? 1.02 : 1.24,
+            minimumInterval: 0.035
+        )
+        return true
+    }
+
     private func updateAppearance() {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         layer.bounds = CGRect(x: 0, y: 0, width: traits.bodySize, height: traits.bodySize)
-        if isZombie,
-           let image = ArtAssets.image(named: "creature-zombie-tier-\(min(zombieTier, 5))") {
+        if let image = creatureImage {
             layer.contents = image
-        } else {
-            layer.contents = IconRenderer.emoji(kindEmoji, size: traits.bodySize * 0.82)
         }
         layer.zPosition = isZombie ? 79 : (kind.isVehicle ? 78 : (kind.isAnimal ? 76 : (kind.isPerson ? 73 : 72)))
+        updateShieldAppearance()
         CATransaction.commit()
     }
 
@@ -822,6 +1010,7 @@ final class CreatureActor {
         walls: [WallEntity]
     ) -> Bool {
         guard isAlive else { return false }
+        updateSurvivalTier(now: now)
         let dt = min(0.1, max(0.005, now.timeIntervalSince(lastUpdateTime)))
         lastUpdateTime = now
         guard updateBurning(now: now, canvas: canvas) else { return false }
@@ -859,8 +1048,9 @@ final class CreatureActor {
             navigationTargetHeading = atan2(position.y - panicFrom.y, position.x - panicFrom.x)
             let headingDelta = shortestAngle(from: heading, to: navigationTargetHeading)
             heading = normalizedAngle(heading + min(abs(headingDelta), 5.2 * CGFloat(dt)) * (headingDelta < 0 ? -1 : 1))
-            position.x += cos(heading) * traits.speed * 1.85 * CGFloat(dt)
-            position.y += sin(heading) * traits.speed * 1.85 * CGFloat(dt)
+            let panicSpeed = traits.speed * survivalSpeedMultiplier * 1.85
+            position.x += cos(heading) * panicSpeed * CGFloat(dt)
+            position.y += sin(heading) * panicSpeed * CGFloat(dt)
             return
         }
 
@@ -885,7 +1075,7 @@ final class CreatureActor {
         let turn = min(abs(headingDelta), maximumTurn) * (headingDelta < 0 ? -1 : 1)
         heading = normalizedAngle(heading + turn)
 
-        var speed = traits.speed
+        var speed = traits.speed * survivalSpeedMultiplier
 
         if isBurning {
             if let threat {
@@ -1260,8 +1450,7 @@ final class CreatureActor {
     private func updateBurning(now: Date, canvas: DestructionCanvas) -> Bool {
         guard let startedAt = burnStartedAt else { return true }
         guard now.timeIntervalSince(startedAt) < burnDuration else {
-            killByFire(canvas: canvas)
-            return false
+            return !killByFire(canvas: canvas)
         }
         return true
     }
@@ -1272,8 +1461,12 @@ final class CreatureActor {
         return sqrt(dx * dx + dy * dy)
     }
 
-    func kill(canvas: DestructionCanvas) {
-        guard isAlive else { return }
+    @discardableResult
+    func kill(canvas: DestructionCanvas) -> Bool {
+        guard isAlive else { return false }
+        if consumeDeathSave(canvas: canvas) {
+            return false
+        }
         isAlive = false
         extinguish()
         playDeathSound(burning: false)
@@ -1312,10 +1505,15 @@ final class CreatureActor {
         fade.isRemovedOnCompletion = false
         layer.add(fade, forKey: "creatureDeath")
         canvas.removeAfter(layer, delay: kind.isPerson || kind.isAnimal ? 0.38 : 0.26)
+        return true
     }
 
-    func killByFire(canvas: DestructionCanvas) {
-        guard isAlive else { return }
+    @discardableResult
+    func killByFire(canvas: DestructionCanvas) -> Bool {
+        guard isAlive else { return false }
+        if consumeDeathSave(canvas: canvas) {
+            return false
+        }
         isAlive = false
         extinguish()
         playDeathSound(burning: true)
@@ -1347,6 +1545,7 @@ final class CreatureActor {
         fade.isRemovedOnCompletion = false
         layer.add(fade, forKey: "creatureFireDeath")
         canvas.removeAfter(layer, delay: kind.isPerson || kind.isAnimal ? 0.54 : 0.36)
+        return true
     }
 
     private func playDeathSound(burning: Bool) {
