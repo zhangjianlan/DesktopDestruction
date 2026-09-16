@@ -719,6 +719,10 @@ final class CreatureActor {
         zombieTier > 0
     }
 
+    var isFusionMonster: Bool {
+        isZombie && zombieTier >= 2
+    }
+
     var canInfect: Bool {
         kind.isPerson || kind.isAnimal
     }

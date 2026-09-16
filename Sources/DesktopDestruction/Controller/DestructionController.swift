@@ -975,6 +975,7 @@ final class DestructionController {
     private func resolveVehicleCollisions() {
         var hadCollision = false
         var vehicleCollisionPairs: [(vehicle: CreatureActor, other: CreatureActor)] = []
+        var fusionMonsterCollisions: [CreatureActor] = []
 
         for (index, vehicle) in creatures.enumerated() {
             guard vehicle.isAlive && vehicle.kind.isVehicle else { continue }
@@ -987,6 +988,9 @@ final class DestructionController {
 
                 if other.kind.isVehicle {
                     vehicleCollisionPairs.append((vehicle, other))
+                    hadCollision = true
+                } else if other.isFusionMonster {
+                    fusionMonsterCollisions.append(vehicle)
                     hadCollision = true
                 } else {
                     let died = other.kill(canvas: canvas)
@@ -1012,6 +1016,10 @@ final class DestructionController {
 
         for collision in vehicleCollisionPairs where collision.vehicle.isAlive {
             explodeVehicle(collision.vehicle)
+        }
+
+        for vehicle in fusionMonsterCollisions where vehicle.isAlive {
+            explodeVehicle(vehicle)
         }
 
         if !vehicleCollisionPairs.isEmpty {
@@ -1185,7 +1193,7 @@ final class DestructionController {
     }
 
     private func resolveGiantZombieDestruction() {
-        let giants = creatures.filter { $0.isZombie && $0.zombieTier >= 2 }
+        let giants = creatures.filter(\.isFusionMonster)
         guard !giants.isEmpty else { return }
 
         for giant in giants where giant.isAlive {
