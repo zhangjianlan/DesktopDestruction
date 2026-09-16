@@ -26,16 +26,16 @@ final class ToolbarController {
         view.addSubview(stackView)
 
         for tool in Tool.allCases {
-            let button = makeButton(tool.emoji, title: tool.name) { [weak self] in
+            let button = makeButton(tool.assetName, title: tool.name) { [weak self] in
                 self?.onTool?(tool)
             }
             stackView.addView(button, in: .leading)
         }
 
         stackView.addView(makeSpacer(), in: .leading)
-        stackView.addView(makeButton("🧹", title: "恢复") { [weak self] in self?.onRestore?() }, in: .leading)
-        stackView.addView(makeButton("⚙️", title: "设置") { [weak self] in self?.onSettings?() }, in: .leading)
-        stackView.addView(makeButton("✕", title: "退出") { [weak self] in self?.onExit?() }, in: .leading)
+        stackView.addView(makeButton("ui-restore", title: "恢复") { [weak self] in self?.onRestore?() }, in: .leading)
+        stackView.addView(makeButton("ui-settings", title: "设置") { [weak self] in self?.onSettings?() }, in: .leading)
+        stackView.addView(makeButton("ui-exit", title: "退出") { [weak self] in self?.onExit?() }, in: .leading)
         showAndScheduleHide()
     }
 
@@ -54,11 +54,15 @@ final class ToolbarController {
         }
     }
 
-    private func makeButton(_ title: String, title label: String, handler: @escaping () -> Void) -> NSButton {
-        let button = ActionButton(title: title, target: nil, action: nil)
+    private func makeButton(_ assetName: String, title label: String, handler: @escaping () -> Void) -> NSButton {
+        let button = ActionButton(title: "", target: nil, action: nil)
         button.isBordered = false
         button.font = NSFont.systemFont(ofSize: 20)
         button.toolTip = label
+        button.image = ArtAssets.nsImage(named: assetName)
+        button.imageScaling = .scaleProportionallyUpOrDown
+        button.imagePosition = .imageOnly
+        button.setAccessibilityLabel(label)
         button.translatesAutoresizingMaskIntoConstraints = false
         button.widthAnchor.constraint(equalToConstant: 42).isActive = true
         button.heightAnchor.constraint(equalToConstant: 36).isActive = true

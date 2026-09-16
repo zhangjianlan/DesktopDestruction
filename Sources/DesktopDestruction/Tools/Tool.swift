@@ -54,6 +54,33 @@ enum Tool: Int, CaseIterable {
         }
     }
 
+    var assetName: String {
+        switch self {
+        case .hammer: return "tool-hammer"
+        case .machineGun: return "tool-machine-gun"
+        case .saw: return "tool-saw"
+        case .water: return "tool-water"
+        case .flame: return "tool-flame"
+        case .bomb: return "tool-bomb"
+        case .eraser: return "tool-eraser"
+        case .rocket: return "tool-rocket"
+        case .fist: return "tool-fist"
+        case .insect: return "tool-insect"
+        case .person: return "tool-person"
+        case .vehicle: return "tool-vehicle"
+        case .animal: return "tool-animal"
+        case .anything: return "tool-anything"
+        }
+    }
+
+    var cursorAssetName: String {
+        switch self {
+        case .machineGun: return "tool-target"
+        case .anything: return "tool-sparkle"
+        default: return assetName
+        }
+    }
+
     var cursorEmoji: String {
         self == .machineGun ? "🎯" : (self == .anything ? "✨" : emoji)
     }

@@ -42,6 +42,7 @@ final class DestructionController {
         backgroundLayer.zPosition = -10
 
         cursorLayer.bounds = CGRect(x: 0, y: 0, width: 52, height: 52)
+        cursorLayer.contentsGravity = .resizeAspect
         cursorLayer.contentsScale = 2
         cursorLayer.zPosition = 100
 
@@ -246,7 +247,7 @@ final class DestructionController {
     }
 
     private func updateCursor(for tool: Tool) {
-        cursorLayer.contents = IconRenderer.emoji(tool.cursorEmoji, size: 40)
+        cursorLayer.contents = ArtAssets.image(named: tool.cursorAssetName)
     }
 
     private func clampedCursorBadgePoint(for point: CGPoint) -> CGPoint {
@@ -411,7 +412,8 @@ final class DestructionController {
 
     private func placeBomb(at point: CGPoint) {
         let bomb = CALayer()
-        bomb.contents = IconRenderer.emoji("💣", size: 44)
+        bomb.contents = ArtAssets.image(named: "tool-bomb")
+        bomb.contentsGravity = .resizeAspect
         bomb.contentsScale = 2
         bomb.bounds = CGRect(x: 0, y: 0, width: 48, height: 48)
         bomb.position = point
@@ -456,7 +458,8 @@ final class DestructionController {
         )
 
         let rocket = CALayer()
-        rocket.contents = IconRenderer.emoji("🚀", size: 44)
+        rocket.contents = ArtAssets.image(named: "tool-rocket")
+        rocket.contentsGravity = .resizeAspect
         rocket.contentsScale = 2
         rocket.bounds = CGRect(x: 0, y: 0, width: 48, height: 48)
         rocket.position = target
@@ -483,7 +486,8 @@ final class DestructionController {
 
     private func throwFist(at target: CGPoint) {
         let fist = CALayer()
-        fist.contents = IconRenderer.emoji("👊", size: 96)
+        fist.contents = ArtAssets.image(named: "tool-fist")
+        fist.contentsGravity = .resizeAspect
         fist.contentsScale = 2
         fist.bounds = CGRect(x: 0, y: 0, width: 100, height: 100)
         fist.position = target
@@ -811,7 +815,8 @@ final class DestructionController {
 
     private func addVehicleExplosion(at point: CGPoint, radius: CGFloat) {
         let blast = CALayer()
-        blast.contents = IconRenderer.emoji("💥", size: radius * 0.78)
+        blast.contents = ArtAssets.image(named: "effect-explosion")
+        blast.contentsGravity = .resizeAspect
         blast.contentsScale = 2
         blast.bounds = CGRect(x: 0, y: 0, width: radius, height: radius)
         blast.position = point
@@ -833,7 +838,8 @@ final class DestructionController {
         canvas.removeAfter(blast, delay: 0.46)
 
         let fire = CALayer()
-        fire.contents = IconRenderer.emoji("🔥", size: radius * 0.42)
+        fire.contents = ArtAssets.image(named: "effect-fire")
+        fire.contentsGravity = .resizeAspect
         fire.contentsScale = 2
         fire.bounds = CGRect(x: 0, y: 0, width: radius * 0.52, height: radius * 0.52)
         fire.position = point
@@ -1002,44 +1008,25 @@ final class DestructionController {
     }
 
     private func addMushroomCloud(at point: CGPoint, radius: CGFloat) {
-        let capSize = radius * 1.5
-        let stemSize = radius * 0.52
-
-        let cap = CALayer()
-        cap.contents = IconRenderer.emoji("☁️", size: capSize)
-        cap.contentsScale = 2
-        cap.bounds = CGRect(x: 0, y: 0, width: capSize, height: capSize * 0.72)
-        cap.position = point
-        cap.zPosition = 84
-
-        let stem = CALayer()
-        stem.contents = IconRenderer.emoji("🌫️", size: stemSize)
-        stem.contentsScale = 2
-        stem.bounds = CGRect(x: 0, y: 0, width: stemSize, height: radius * 0.9)
-        stem.position = point
-        stem.zPosition = 83
-
-        canvas.addTransient(cap)
-        canvas.addTransient(stem)
+        let cloudSize = radius * 1.6
+        let cloud = CALayer()
+        cloud.contents = ArtAssets.image(named: "effect-mushroom-cloud")
+        cloud.contentsGravity = .resizeAspect
+        cloud.contentsScale = 2
+        cloud.bounds = CGRect(x: 0, y: 0, width: cloudSize, height: cloudSize)
+        cloud.position = point
+        cloud.zPosition = 84
+        canvas.addTransient(cloud)
 
         animateMushroomPart(
-            cap,
-            from: point,
-            to: CGPoint(x: point.x, y: point.y + radius * 0.85),
-            fromScale: 0.18,
-            toScale: 1.25,
+            cloud,
+            from: CGPoint(x: point.x, y: point.y - radius * 0.08),
+            to: CGPoint(x: point.x, y: point.y + radius * 0.62),
+            fromScale: 0.14,
+            toScale: 1.18,
             duration: 1.35
         )
-        animateMushroomPart(
-            stem,
-            from: CGPoint(x: point.x, y: point.y - radius * 0.08),
-            to: CGPoint(x: point.x, y: point.y + radius * 0.25),
-            fromScale: 0.12,
-            toScale: 1,
-            duration: 1.1
-        )
-        canvas.removeAfter(cap, delay: 1.55)
-        canvas.removeAfter(stem, delay: 1.35)
+        canvas.removeAfter(cloud, delay: 1.55)
     }
 
     private func animateMushroomPart(
@@ -1076,10 +1063,8 @@ final class DestructionController {
 
     private func addDirectionalBlast(at point: CGPoint, angle: CGFloat, radius: CGFloat) {
         let blast = CALayer()
-        blast.contents = IconRenderer.softCircle(
-            NSColor(red: 1, green: 0.62, blue: 0.16, alpha: 0.78),
-            diameter: 96
-        )
+        blast.contents = ArtAssets.image(named: "effect-explosion")
+        blast.contentsGravity = .resize
         blast.contentsScale = 2
         blast.bounds = CGRect(x: 0, y: 0, width: radius * 2, height: radius * 1.1)
         blast.position = point
@@ -1106,7 +1091,8 @@ final class DestructionController {
 
     private func addFlash(at point: CGPoint, radius: CGFloat) {
         let flash = CALayer()
-        flash.contents = IconRenderer.softCircle(NSColor.white, diameter: 96)
+        flash.contents = ArtAssets.image(named: "effect-muzzle-flash")
+        flash.contentsGravity = .resizeAspect
         flash.contentsScale = 2
         flash.bounds = CGRect(x: 0, y: 0, width: radius * 2, height: radius * 2)
         flash.position = point
@@ -1123,14 +1109,13 @@ final class DestructionController {
     }
 
     private func addShockwave(at point: CGPoint, radius: CGFloat) {
-        let wave = CAShapeLayer()
-        wave.strokeColor = CGColor(red: 1, green: 1, blue: 1, alpha: 0.9)
-        wave.fillColor = NSColor.clear.cgColor
-        wave.lineWidth = 8
+        let wave = CALayer()
+        wave.contents = ArtAssets.image(named: "effect-shockwave")
+        wave.contentsGravity = .resizeAspect
+        wave.contentsScale = 2
         wave.bounds = CGRect(x: 0, y: 0, width: radius * 2, height: radius * 2)
         wave.position = point
         wave.zPosition = 75
-        wave.path = CGPath(ellipseIn: CGRect(origin: .zero, size: wave.bounds.size), transform: nil)
         canvas.addTransient(wave)
 
         let scale = CABasicAnimation(keyPath: "transform.scale")

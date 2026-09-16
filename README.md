@@ -1,6 +1,6 @@
 # DesktopDestruction
 
-一款 macOS 原生桌面视觉发泄工具。启动后会先截取当前桌面画面，再在全屏透明覆盖层中展示锤子、机枪、电锯、水枪、火焰、炸弹、橡皮擦、火箭和拳头等效果。
+一款 macOS 原生桌面视觉发泄工具。启动后会先截取当前桌面画面，再在全屏透明覆盖层中展示锤子、机枪、电锯、水枪、火焰、炸弹、橡皮擦、火箭、拳头以及虫子、小人、车辆、动物和任意 emoji 等 14 种工具效果。
 
 ## 安全边界
 
@@ -39,11 +39,25 @@ swift build
 DD_FAKE_BACKGROUND=1 ./build/DesktopDestruction.app/Contents/MacOS/DesktopDestruction
 ```
 
+## 美术资源
+
+内置的漫画风工具图标和特效贴图位于 `Sources/DesktopDestruction/Resources/Art`。如需调整配色或造型，可以修改 `scripts/generate_art.py` 后重新生成：
+
+```bash
+python3 scripts/generate_art.py Sources/DesktopDestruction/Resources/Art
+```
+
+生成脚本依赖 Python 3 和 Pillow。
+
 ## 操作
 
 - 左键：使用当前工具
 - 右键拖动：打开工具轮盘
-- `1` 到 `9`：切换工具
+- `1` 到 `9`、`0`：切换工具或放虫子
+- `P`：放小人
+- `A`：放动物
+- `V`：放车
+- `E`：放任意 emoji
 - 滚轮：切换工具
 - `R`：恢复桌面
 - 连按两次 `ESC`：退出
@@ -51,4 +65,4 @@ DD_FAKE_BACKGROUND=1 ./build/DesktopDestruction.app/Contents/MacOS/DesktopDestru
 
 ## 说明
 
-当前实现已经覆盖需求中的核心玩法：一次性截图背景、9 种工具、持久裂纹/弹孔/灼痕/水痕、粒子、屏幕震动、合成音效、右键轮盘、自动隐藏工具栏、设置面板、恢复和退出。ScreenCaptureKit 可作为后续升级点，用于更高的多屏与兼容性适配。
+当前实现已经覆盖需求中的核心玩法：一次性截图背景、14 种工具、持久裂纹/弹孔/灼痕/水痕、漫画风粒子与特效、屏幕震动、合成音效、右键轮盘、自动隐藏工具栏、设置面板、恢复和退出。ScreenCaptureKit 可作为后续升级点，用于更高的多屏与兼容性适配。
