@@ -23,17 +23,14 @@ swift build
 ./scripts/build_app.sh x86_64
 ```
 
-## 预编译产物
+## 下载
 
-- [Apple Silicon / arm64](artifacts/DesktopDestruction-Apple-Silicon.zip)
-- [Intel / x86_64](artifacts/DesktopDestruction-Intel-x86_64.zip)
+预编译包已放在 GitHub Releases：
 
-压缩包内是完整的 `.app`，解压后可直接拖到“应用程序”。如果需要校验文件，可在仓库根目录执行：
+- [Apple Silicon / arm64](https://github.com/zhangjianlan/DesktopDestruction/releases/download/v1.0.0/DesktopDestruction-Apple-Silicon.zip)
+- [Intel / x86_64](https://github.com/zhangjianlan/DesktopDestruction/releases/download/v1.0.0/DesktopDestruction-Intel-x86_64.zip)
 
-```bash
-cd artifacts
-shasum -a 256 -c SHA256SUMS
-```
+压缩包内是完整的 `.app`，解压后可直接拖到“应用程序”。
 
 脚本会优先使用钥匙串里的 Apple Development 证书签名。这样每次重新编译后，macOS 的屏幕录制授权仍指向同一个稳定签名主体，而不是 ad-hoc 签名的单个 `cdhash`。没有证书时才退回 ad-hoc 签名。
 
