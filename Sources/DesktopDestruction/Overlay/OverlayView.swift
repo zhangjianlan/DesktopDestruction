@@ -128,6 +128,10 @@ final class OverlayView: NSView {
             controller?.toolManager.select(.anything)
             return
         }
+        if characters.lowercased() == "w" {
+            controller?.toolManager.select(.wall)
+            return
+        }
         super.keyDown(with: event)
     }
 }

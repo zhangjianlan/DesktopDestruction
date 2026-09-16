@@ -5,8 +5,9 @@ final class DestructionCanvas {
     var remainingDamageCount: Int { damageItems.count }
     private let damageLayer = CALayer()
     private let transientLayer = CALayer()
-    private var damageItems: [(layer: CALayer, frame: CGRect)] = []
+    private var damageItems: [(layer: CALayer, frame: CGRect, isPermanent: Bool)] = []
     private let maxDamageLayers = 1800
+    private var nonPermanentDamageCount = 0
 
     init() {
         root.masksToBounds = false
@@ -25,7 +26,7 @@ final class DestructionCanvas {
         CATransaction.commit()
     }
 
-    func addDamage(image: CGImage, frame: CGRect) {
+    func addDamage(image: CGImage, frame: CGRect, permanent: Bool = false) {
         pruneDamageIfNeeded()
         let layer = CALayer()
         layer.contents = image
@@ -37,18 +38,33 @@ final class DestructionCanvas {
         CATransaction.setDisableActions(true)
         damageLayer.addSublayer(layer)
         CATransaction.commit()
-        damageItems.append((layer, frame))
+        damageItems.append((layer, frame, permanent))
+        if !permanent {
+            nonPermanentDamageCount += 1
+        }
     }
 
     private func pruneDamageIfNeeded() {
-        guard damageItems.count >= maxDamageLayers else { return }
-        let removeCount = min(damageItems.count, 64)
-        let removedLayers = damageItems.prefix(removeCount)
+        var removedIndexes = IndexSet()
+        for (index, item) in damageItems.enumerated()
+        where !item.isPermanent && nonPermanentDamageCount - removedIndexes.count >= maxDamageLayers {
+            removedIndexes.insert(index)
+            if nonPermanentDamageCount - removedIndexes.count < maxDamageLayers {
+                break
+            }
+        }
+
+        guard !removedIndexes.isEmpty else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        removedLayers.forEach { $0.layer.removeFromSuperlayer() }
+        for index in removedIndexes {
+            damageItems[index].layer.removeFromSuperlayer()
+        }
         CATransaction.commit()
-        damageItems.removeFirst(removeCount)
+        nonPermanentDamageCount -= removedIndexes.count
+        for index in removedIndexes.reversed() {
+            damageItems.remove(at: index)
+        }
     }
 
     func addTransient(_ layer: CALayer) {
@@ -84,6 +100,9 @@ final class DestructionCanvas {
         for (index, item) in damageItems.enumerated().reversed() where item.frame.intersects(eraseRect) {
             item.layer.removeFromSuperlayer()
             damageItems.remove(at: index)
+            if !item.isPermanent {
+                nonPermanentDamageCount -= 1
+            }
             removed += 1
         }
         return removed
@@ -97,6 +116,7 @@ final class DestructionCanvas {
         damageLayer.sublayers?.forEach { $0.removeFromSuperlayer() }
         CATransaction.commit()
         damageItems.removeAll()
+        nonPermanentDamageCount = 0
         return removedCount
     }
 }

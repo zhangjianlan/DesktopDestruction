@@ -6,17 +6,20 @@ cd "$(dirname "$0")/.."
 TARGET="${1:-native}"
 DEFAULT_SIGNING_IDENTITY="$(security find-identity -v -p codesigning | sed -n 's/^.*"\(.*\)"$/\1/p' | head -n 1)"
 SIGNING_IDENTITY="${DD_CODESIGN_IDENTITY:-${DEFAULT_SIGNING_IDENTITY:--}}"
+ARTIFACT_ZIP=""
 case "$TARGET" in
   arm64)
     BUILD_ROOT=".build/arm64-app"
     BIN_DIR="$BUILD_ROOT/arm64-apple-macosx/release"
     APP_DIR="build/DesktopDestruction-Apple-Silicon.app"
+    ARTIFACT_ZIP="artifacts/DesktopDestruction-Apple-Silicon.zip"
     swift build -c release --arch arm64 --build-path "$BUILD_ROOT"
     ;;
   x86_64)
     BUILD_ROOT=".build/x86_64-app"
     BIN_DIR="$BUILD_ROOT/x86_64-apple-macosx/release"
     APP_DIR="build/DesktopDestruction-Intel-x86_64.app"
+    ARTIFACT_ZIP="artifacts/DesktopDestruction-Intel-x86_64.zip"
     swift build -c release --arch x86_64 --build-path "$BUILD_ROOT"
     ;;
   universal)
@@ -62,8 +65,8 @@ cat > "$STAGING_APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleIdentifier</key><string>com.codex.desktopdestruction</string>
   <key>CFBundleName</key><string>DesktopDestruction</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
-  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleShortVersionString</key><string>1.1</string>
+  <key>CFBundleVersion</key><string>2</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
@@ -85,8 +88,18 @@ rm -rf "$APP_DIR"
 # managed by File Provider.
 ditto --norsrc --noextattr "$STAGING_APP" "$APP_DIR"
 
-VERIFY_DIR="$(mktemp -d)"
-ditto --norsrc --noextattr "$APP_DIR" "$VERIFY_DIR/DesktopDestruction.app"
-codesign --verify --deep --strict "$VERIFY_DIR/DesktopDestruction.app"
+VERIFY_DIR="$(mktemp -d "${TMPDIR:-/tmp}/DesktopDestruction-verify.XXXXXX")"
+VERIFY_APP="$VERIFY_DIR/$(basename "$APP_DIR")"
+ditto --norsrc --noextattr "$APP_DIR" "$VERIFY_APP"
+codesign --verify --deep --strict "$VERIFY_APP"
+
+if [[ -n "$ARTIFACT_ZIP" ]]; then
+  mkdir -p "$(dirname "$ARTIFACT_ZIP")"
+  ditto -c -k --norsrc --noextattr --keepParent "$VERIFY_APP" "$ARTIFACT_ZIP"
+fi
+
 echo "Built $APP_DIR"
+if [[ -n "$ARTIFACT_ZIP" ]]; then
+  echo "Packaged $ARTIFACT_ZIP"
+fi
 echo "Signing identity: $SIGNING_IDENTITY"

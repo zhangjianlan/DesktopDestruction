@@ -26,6 +26,7 @@ final class DestructionController {
     private var lastEscapeTime: Date?
     private var burningSpots: [BurningSpot] = []
     private var creatures: [CreatureActor] = []
+    private var walls: [WallEntity] = []
     private var simulationTimer: Timer?
     private var lastFireIgnition = Date.distantPast
     private var nextCreatureFireCheck = Date.distantPast
@@ -76,7 +77,7 @@ final class DestructionController {
         hudLayer.masksToBounds = true
         hudLayer.backgroundColor = CGColor(gray: 0, alpha: 0.68)
         hudLayer.zPosition = 90
-        setHUD("🔨 锤子 · 左键使用 · 右键轮盘 · 0 放虫 · A 放动物 · P 放人 · V 放车 · E 任意 emoji · R 恢复 · 连按 ESC 退出")
+        setHUD("🔨 锤子 · 左键使用 · 右键轮盘 · 0 放虫 · A 放动物 · P 放人 · V 放车 · W 放围墙 · E 任意 emoji · R 恢复 · 连按 ESC 退出")
 
         emojiInputPanel.onCommit = { [weak self] options in
             self?.emojiOptions = options
@@ -146,34 +147,25 @@ final class DestructionController {
         pointerMoved(to: point)
         PipelineLog.info("mouse-down received tool=\(toolManager.current.rawValue) point=(\(point.x), \(point.y))")
         switch toolManager.current {
-        case .insect, .person, .vehicle, .animal, .anything, .eraser:
-            break
-        case .water:
-            break
         case .flame:
             igniteCreatures(at: point, radius: 48)
-        default:
-            damageCreatures(at: point, radius: 44)
-        }
-        switch toolManager.current {
+            startFlame(at: point)
+        case .water:
+            startWater(at: point)
+        case .bomb:
+            placeBomb(at: point)
+        case .nuke:
+            launchNuke(to: point)
         case .hammer:
             hammerSmash(at: point)
         case .machineGun:
             startGun()
         case .saw:
             startSaw(at: point)
-        case .water:
-            startWater(at: point)
-        case .flame:
-            startFlame(at: point)
-        case .bomb:
-            placeBomb(at: point)
-        case .eraser:
-            eraseAt(point)
-        case .rocket:
-            launchRocket(to: point)
         case .fist:
             throwFist(at: point)
+        case .eraser:
+            eraseAt(point)
         case .insect:
             placeInsect(at: point)
         case .person:
@@ -184,6 +176,8 @@ final class DestructionController {
             placeAnimal(at: point)
         case .anything:
             placeAnything(at: point)
+        case .wall:
+            placeWall(at: point)
         }
     }
 
@@ -286,7 +280,7 @@ final class DestructionController {
     }
 
     private func hammerSmash(at point: CGPoint) {
-        damageCreatures(at: point, radius: 78)
+        damageCreatures(at: point, radius: 78, amount: 2)
         addCrack(at: point, radius: 88, strength: 1.7)
         let secondary = CGPoint(
             x: point.x + CGFloat.random(in: -30...30),
@@ -320,7 +314,7 @@ final class DestructionController {
         if let damage = DamageRenderer.renderBulletHole(at: point, radius: 25) {
             canvas.addDamage(image: damage.0, frame: damage.1)
         }
-        damageCreatures(at: point, radius: 34)
+        damageCreatures(at: point, radius: 34, amount: 1)
         addTracer(to: point)
         ParticleFactory.muzzleFlash(at: point, in: canvas)
         AudioManager.shared.play(
@@ -376,7 +370,7 @@ final class DestructionController {
         let dy = point.y - last.y
         guard sqrt(dx * dx + dy * dy) >= 14 else { return }
 
-        damageCreatures(at: point, radius: 48)
+        damageCreatures(at: point, radius: 48, amount: 1)
         if let damage = DamageRenderer.renderCutSegment(from: last, to: point, width: 10) {
             canvas.addDamage(image: damage.0, frame: damage.1)
         }
@@ -445,7 +439,7 @@ final class DestructionController {
         }
     }
 
-    private func launchRocket(to target: CGPoint) {
+    private func launchNuke(to target: CGPoint) {
         let bounds = view.bounds
         let center = CGPoint(x: bounds.midX, y: bounds.midY)
         let dx = target.x - center.x
@@ -457,31 +451,31 @@ final class DestructionController {
             y: target.y + sin(angle) * travel
         )
 
-        let rocket = CALayer()
-        rocket.contents = ArtAssets.image(named: "tool-rocket")
-        rocket.contentsGravity = .resizeAspect
-        rocket.contentsScale = 2
-        rocket.bounds = CGRect(x: 0, y: 0, width: 48, height: 48)
-        rocket.position = target
-        rocket.setAffineTransform(CGAffineTransform(rotationAngle: angle - .pi / 2))
-        rocket.zPosition = 70
-        canvas.addTransient(rocket)
-        ParticleFactory.rocketTrail(attachedTo: rocket)
+        let missile = CALayer()
+        missile.contents = ArtAssets.image(named: "tool-nuke")
+        missile.contentsGravity = .resizeAspect
+        missile.contentsScale = 2
+        missile.bounds = CGRect(x: 0, y: 0, width: 54, height: 54)
+        missile.position = target
+        missile.setAffineTransform(CGAffineTransform(rotationAngle: angle - .pi / 2))
+        missile.zPosition = 70
+        canvas.addTransient(missile)
+        ParticleFactory.rocketTrail(attachedTo: missile)
 
         let flight = CABasicAnimation(keyPath: "position")
         flight.fromValue = NSValue(point: start)
         flight.toValue = NSValue(point: target)
         flight.duration = 0.55
         flight.timingFunction = CAMediaTimingFunction(name: .easeIn)
-        rocket.add(flight, forKey: "rocketFlight")
+        missile.add(flight, forKey: "nukeFlight")
         AudioManager.shared.play("rocket_launch", gain: 0.9)
 
         after(0.55) { [weak self] in
             guard let self else { return }
-            rocket.removeFromSuperlayer()
-            self.rocketBlast(at: target, angle: angle)
+            missile.removeFromSuperlayer()
+            self.nukeBlast(at: target, angle: angle)
         }
-        canvas.removeAfter(rocket, delay: 0.6)
+        canvas.removeAfter(missile, delay: 0.6)
     }
 
     private func throwFist(at target: CGPoint) {
@@ -502,7 +496,7 @@ final class DestructionController {
 
         after(0.18) { [weak self] in
             guard let self else { return }
-            self.damageCreatures(at: target, radius: 86)
+            self.damageCreatures(at: target, radius: 86, amount: 3)
             self.addCrack(at: target, radius: 98, strength: 2.1)
             self.addCrack(at: target, radius: 48, strength: 1.2)
             ParticleFactory.sparks(at: target, count: 20, in: self.canvas)
@@ -546,7 +540,8 @@ final class DestructionController {
 
     private func bombBlast(at point: CGPoint) {
         let radius: CGFloat = 215
-        damageCreatures(at: point, radius: radius + 24)
+        damageCreatures(at: point, radius: radius + 24, amount: 1000)
+        damageWalls(at: point, radius: radius, amount: 180)
         addFlash(at: point, radius: radius * 0.9)
         addShockwave(at: point, radius: radius * 0.75)
         addMushroomCloud(at: point, radius: radius)
@@ -570,7 +565,8 @@ final class DestructionController {
         after(0.34) { [weak self] in
             guard let self else { return }
             self.addShockwave(at: point, radius: radius * 1.15)
-            self.damageCreatures(at: point, radius: radius * 1.05)
+            self.damageCreatures(at: point, radius: radius * 1.05, amount: 1000)
+            self.damageWalls(at: point, radius: radius * 0.9, amount: 100)
             ParticleFactory.smoke(at: point, count: 24, in: self.canvas)
             ParticleFactory.dust(at: point, count: 30, in: self.canvas)
             AudioManager.shared.play("explosion", gain: 0.62, rate: 0.55)
@@ -578,15 +574,16 @@ final class DestructionController {
         }
     }
 
-    private func rocketBlast(at point: CGPoint, angle: CGFloat) {
-        let radius: CGFloat = 145
-        damageCreatures(at: point, radius: radius + 18)
-        addFlash(at: point, radius: radius * 0.68)
+    private func nukeBlast(at point: CGPoint, angle: CGFloat) {
+        let radius: CGFloat = 620
+        damageCreatures(at: point, radius: radius, amount: 5000)
+        damageWalls(at: point, radius: radius, amount: 500)
+        addFlash(at: point, radius: radius * 0.82)
         addShockwave(at: point, radius: radius * 0.75)
-        addDirectionalBlast(at: point, angle: angle, radius: radius)
+        addDirectionalBlast(at: point, angle: angle, radius: radius * 0.58)
 
-        for index in 0..<4 {
-            let distance = radius * 0.18 * CGFloat(index)
+        for index in 0..<8 {
+            let distance = radius * 0.07 * CGFloat(index)
             let gougePoint = CGPoint(
                 x: point.x + cos(angle) * distance,
                 y: point.y + sin(angle) * distance
@@ -594,20 +591,57 @@ final class DestructionController {
             if let damage = DamageRenderer.renderGouge(
                 at: gougePoint,
                 angle: angle,
-                radius: radius * (0.68 - CGFloat(index) * 0.08)
+                radius: radius * (0.42 - CGFloat(index) * 0.025)
             ) {
                 canvas.addDamage(image: damage.0, frame: damage.1)
             }
         }
-        addScorch(at: point, radius: radius * 0.5)
-        addCrack(at: point, radius: radius * 0.42, strength: 1.8)
-        ParticleFactory.debris(at: point, count: 28, in: canvas)
-        ParticleFactory.sparks(at: point, count: 38, in: canvas)
-        ParticleFactory.smoke(at: point, count: 22, in: canvas)
-        igniteFire(at: point, intensity: 1.2, force: true)
-        AudioManager.shared.play("explosion", gain: 0.92, rate: 1.22)
-        AudioManager.shared.play("rocket_launch", gain: 0.5, rate: 0.72)
-        ScreenShake.shake(canvas.root, intensity: 22, duration: 0.4)
+
+        addScorch(at: point, radius: radius * 0.36)
+        addCrack(at: point, radius: radius * 0.28, strength: 3.4)
+        addMushroomCloud(at: point, radius: radius)
+        ParticleFactory.debris(at: point, count: 72, in: canvas)
+        ParticleFactory.sparks(at: point, count: 90, in: canvas)
+        ParticleFactory.smoke(at: point, count: 86, in: canvas)
+        ParticleFactory.glassShards(at: point, count: 44, in: canvas)
+
+        for index in 0..<12 {
+            let blastAngle = CGFloat(index) / 12 * 2 * .pi
+            let distance = radius * CGFloat.random(in: 0.08...0.3)
+            igniteFire(
+                at: CGPoint(
+                    x: point.x + cos(blastAngle) * distance,
+                    y: point.y + sin(blastAngle) * distance
+                ),
+                intensity: 1.5,
+                force: true
+            )
+        }
+
+        AudioManager.shared.play("explosion", gain: 1, rate: 0.52)
+        AudioManager.shared.play("rocket_launch", gain: 0.7, rate: 0.45)
+        AudioManager.shared.play("glass_shatter", gain: 0.65, rate: 0.78)
+        ScreenShake.shake(canvas.root, intensity: 46, duration: 1.1)
+
+        after(0.38) { [weak self] in
+            guard let self else { return }
+            self.addShockwave(at: point, radius: radius * 1.05)
+            self.damageCreatures(at: point, radius: radius * 0.92, amount: 2500)
+            self.damageWalls(at: point, radius: radius * 0.85, amount: 240)
+            ParticleFactory.smoke(at: point, count: 54, in: self.canvas)
+            ParticleFactory.dust(at: point, count: 70, in: self.canvas)
+            ScreenShake.shake(self.canvas.root, intensity: 29, duration: 0.7)
+        }
+
+        after(0.82) { [weak self] in
+            guard let self else { return }
+            self.addShockwave(at: point, radius: radius * 1.24)
+            self.damageCreatures(at: point, radius: radius * 1.08, amount: 1800)
+            self.damageWalls(at: point, radius: radius, amount: 180)
+            ParticleFactory.smoke(at: point, count: 38, in: self.canvas)
+            AudioManager.shared.play("explosion", gain: 0.48, rate: 0.38)
+            ScreenShake.shake(self.canvas.root, intensity: 18, duration: 0.5)
+        }
     }
 
     private func addCrack(at point: CGPoint, radius: CGFloat, strength: CGFloat = 1) {
@@ -651,7 +685,7 @@ final class DestructionController {
 
     private func placePerson(at point: CGPoint) {
         guard creatures.count < 220 else { return }
-        let species = PersonSpecies.allCases.randomElement() ?? .walker
+        let species = PersonSpecies.randomSpawn()
         let actor = CreatureActor(at: point, kind: .person(species))
         canvas.addTransient(actor.layer)
         creatures.append(actor)
@@ -718,6 +752,48 @@ final class DestructionController {
         AudioManager.shared.play("switch_click", gain: 0.55, rate: 1.25)
     }
 
+    private func placeWall(at point: CGPoint) {
+        guard walls.count < 120 else { return }
+        let wall = WallEntity(at: point, size: CGSize(width: 210, height: 36))
+        canvas.addTransient(wall.layer)
+        walls.append(wall)
+        ParticleFactory.dust(at: point, count: 10, in: canvas)
+        AudioManager.shared.play("hammer_hit", gain: 0.45, rate: 0.75)
+        ensureSimulation()
+    }
+
+    private func damageWalls(at point: CGPoint, radius: CGFloat, amount: CGFloat) {
+        for wall in walls where wall.isAlive && wall.hitTest(position: point, radius: radius) {
+            wall.applyDamage(amount, canvas: canvas)
+        }
+        walls.removeAll { !$0.isAlive }
+    }
+
+    private func addCreatureEffect(named name: String, at point: CGPoint, size: CGFloat) {
+        let effect = CALayer()
+        effect.contents = ArtAssets.image(named: name)
+        effect.contentsGravity = .resizeAspect
+        effect.contentsScale = 2
+        effect.bounds = CGRect(x: 0, y: 0, width: size, height: size)
+        effect.position = point
+        effect.zPosition = 86
+        canvas.addTransient(effect)
+
+        let scale = CABasicAnimation(keyPath: "transform.scale")
+        scale.fromValue = 0.35
+        scale.toValue = 1.2
+        scale.duration = 0.26
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1
+        fade.toValue = 0
+        fade.duration = 0.3
+        fade.fillMode = .forwards
+        fade.isRemovedOnCompletion = false
+        effect.add(scale, forKey: "creatureEffectScale")
+        effect.add(fade, forKey: "creatureEffectFade")
+        canvas.removeAfter(effect, delay: 0.34)
+    }
+
     private func igniteFire(at point: CGPoint, intensity: CGFloat = 1.25, force: Bool = false) {
         let now = Date()
         guard force || now.timeIntervalSince(lastFireIgnition) >= 0.48 else { return }
@@ -776,15 +852,20 @@ final class DestructionController {
     }
 
     @discardableResult
-    private func damageCreatures(at point: CGPoint, radius: CGFloat) -> Int {
+    private func damageCreatures(at point: CGPoint, radius: CGFloat, amount: CGFloat = 1000) -> Int {
         var affected = 0
         let hitCreatures = creatures.filter { $0.hitTest(point, radius: radius) }
         for creature in hitCreatures {
             if creature.kind.isVehicle {
                 affected += explodeVehicle(creature)
             } else {
-                creature.kill(canvas: canvas)
-                affected += 1
+                if creature.applyDamage(amount, from: point) {
+                    creature.kill(canvas: canvas)
+                    affected += 1
+                } else {
+                    affected += 1
+                    ParticleFactory.dust(at: creature.currentPosition, count: 4, in: canvas)
+                }
             }
         }
         creatures.removeAll { !$0.isAlive }
@@ -804,7 +885,9 @@ final class DestructionController {
             if creature.kind.isVehicle {
                 affected += explodeVehicle(creature)
             } else {
-                creature.kill(canvas: canvas)
+                if creature.applyDamage(1000, from: point) {
+                    creature.kill(canvas: canvas)
+                }
                 affected += 1
             }
         }
@@ -971,7 +1054,24 @@ final class DestructionController {
                 canvas: canvas,
                 bounds: bounds,
                 threat: currentCursorPoint,
-                others: creatures
+                others: creatures,
+                walls: walls
+            )
+        }
+        CATransaction.commit()
+
+        let persistentDamageChance: CGFloat = creatures.count < 90 ? 1 : (creatures.count < 150 ? 0.55 : 0.28)
+        resolveCreatureInteractions(now: now)
+        resolveGiantZombieDestruction()
+        mergeZombies()
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for creature in creatures where creature.isAlive {
+            creature.biteDesktopIfReady(
+                now: now,
+                canvas: canvas,
+                chance: persistentDamageChance
             )
         }
         CATransaction.commit()
@@ -998,11 +1098,113 @@ final class DestructionController {
         }
     }
 
+    private func resolveCreatureInteractions(now: Date) {
+        for creature in creatures where creature.isAlive {
+            guard let target = creature.creatureBiteTargetIfReady(now: now, others: creatures) else {
+                continue
+            }
+
+            if creature.isZombie {
+                target.infect()
+                addCreatureEffect(
+                    named: "effect-zombie-bite",
+                    at: target.currentPosition,
+                    size: max(48, creature.traits.biteRadius * 4)
+                )
+                ParticleFactory.dust(at: target.currentPosition, count: 5, in: canvas)
+                AudioManager.shared.play("switch_click", gain: 0.22, rate: 0.55)
+            } else if creature.kind.isAnimal {
+                target.kill(canvas: canvas)
+                creature.evolve()
+                addCreatureEffect(
+                    named: "effect-evolution",
+                    at: creature.currentPosition,
+                    size: max(62, creature.traits.bodySize * 1.1)
+                )
+                ParticleFactory.dust(at: creature.currentPosition, count: 9, in: canvas)
+                if let damage = DamageRenderer.renderChewMarks(
+                    at: target.currentPosition,
+                    radius: creature.traits.biteRadius,
+                    shape: creature.traits.biteShape
+                ) {
+                    canvas.addDamage(image: damage.0, frame: damage.1)
+                }
+            }
+        }
+        creatures.removeAll { !$0.isAlive }
+    }
+
+    private func mergeZombies() {
+        guard creatures.contains(where: \.isZombie) else { return }
+        let maximumTier = creatures.compactMap { $0.isZombie ? $0.zombieTier : nil }.max() ?? 0
+
+        for tier in 1...max(1, maximumTier) {
+            var sameTierZombies = creatures.filter { $0.isZombie && $0.zombieTier == tier }
+            while sameTierZombies.count >= 6 {
+                let merging = Array(sameTierZombies.prefix(6))
+                let survivor = merging[0]
+                for zombie in merging.dropFirst() {
+                    zombie.discard()
+                }
+                survivor.promoteZombieTier()
+
+                if let damage = DamageRenderer.renderScorch(
+                    at: survivor.currentPosition,
+                    radius: survivor.traits.bodySize * 0.7
+                ) {
+                    canvas.addDamage(image: damage.0, frame: damage.1)
+                }
+                ParticleFactory.dust(at: survivor.currentPosition, count: 22, in: canvas)
+                ParticleFactory.sparks(at: survivor.currentPosition, count: 14, in: canvas)
+                AudioManager.shared.play("punch_hit", gain: 0.45, rate: 0.55)
+                sameTierZombies.removeAll { !($0.isAlive) }
+            }
+        }
+
+        creatures.removeAll { !$0.isAlive }
+    }
+
+    private func resolveGiantZombieDestruction() {
+        let giants = creatures.filter { $0.isZombie && $0.zombieTier >= 2 }
+        guard !giants.isEmpty else { return }
+
+        for giant in giants where giant.isAlive {
+            for vehicle in creatures
+            where vehicle.isAlive && vehicle.kind.isVehicle && vehicle.id != giant.id {
+                if vehicle.hitTest(giant.currentPosition, radius: giant.traits.hitRadius) {
+                    explodeVehicle(vehicle)
+                }
+            }
+
+            for victim in creatures
+            where victim.isAlive
+                && !victim.kind.isVehicle
+                && !victim.isZombie
+                && victim.id != giant.id
+                && victim.hitTest(giant.currentPosition, radius: giant.traits.hitRadius) {
+                if victim.applyDamage(giant.destructionPower, from: giant.currentPosition) {
+                    victim.kill(canvas: canvas)
+                }
+            }
+
+            for wall in walls where wall.isAlive {
+                if wall.hitTest(position: giant.currentPosition, radius: giant.traits.hitRadius) {
+                    wall.applyDamage(giant.destructionPower, canvas: canvas)
+                }
+            }
+        }
+
+        walls.removeAll { !$0.isAlive }
+        creatures.removeAll { !$0.isAlive }
+    }
+
     private func clearActiveEffects() {
         burningSpots.forEach { $0.extinguish() }
         creatures.forEach { $0.discard() }
+        walls.forEach { $0.discard() }
         burningSpots.removeAll()
         creatures.removeAll()
+        walls.removeAll()
         simulationTimer?.invalidate()
         simulationTimer = nil
     }

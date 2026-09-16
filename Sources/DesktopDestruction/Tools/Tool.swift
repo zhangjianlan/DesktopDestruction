@@ -8,13 +8,14 @@ enum Tool: Int, CaseIterable {
     case flame = 5
     case bomb = 6
     case eraser = 7
-    case rocket = 8
+    case nuke = 8
     case fist = 9
     case insect = 10
     case person = 11
     case vehicle = 12
     case animal = 13
     case anything = 14
+    case wall = 15
 
     var name: String {
         switch self {
@@ -25,13 +26,14 @@ enum Tool: Int, CaseIterable {
         case .flame: return "火焰"
         case .bomb: return "炸弹"
         case .eraser: return "橡皮擦"
-        case .rocket: return "火箭"
+        case .nuke: return "核弹"
         case .fist: return "拳头"
         case .insect: return "放虫子"
         case .person: return "放小人"
         case .vehicle: return "放车"
         case .animal: return "放动物"
         case .anything: return "任意 emoji"
+        case .wall: return "放围墙"
         }
     }
 
@@ -44,13 +46,14 @@ enum Tool: Int, CaseIterable {
         case .flame: return "🔥"
         case .bomb: return "💣"
         case .eraser: return "🧽"
-        case .rocket: return "🚀"
+        case .nuke: return "☢️"
         case .fist: return "👊"
         case .insect: return "🐛"
         case .person: return "🧑"
         case .vehicle: return "🚗"
         case .animal: return "🐾"
         case .anything: return "🎲"
+        case .wall: return "🧱"
         }
     }
 
@@ -63,13 +66,14 @@ enum Tool: Int, CaseIterable {
         case .flame: return "tool-flame"
         case .bomb: return "tool-bomb"
         case .eraser: return "tool-eraser"
-        case .rocket: return "tool-rocket"
+        case .nuke: return "tool-nuke"
         case .fist: return "tool-fist"
         case .insect: return "tool-insect"
         case .person: return "tool-person"
         case .vehicle: return "tool-vehicle"
         case .animal: return "tool-animal"
         case .anything: return "tool-anything"
+        case .wall: return "tool-wall"
         }
     }
 

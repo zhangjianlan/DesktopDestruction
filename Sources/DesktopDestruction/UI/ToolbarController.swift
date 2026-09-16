@@ -1,7 +1,19 @@
 import AppKit
 
 final class ToolbarController {
-    let view = NSView(frame: CGRect(x: 0, y: 0, width: 872, height: 46))
+    private static let buttonWidth: CGFloat = 42
+    private static let edgeInset: CGFloat = 8
+    private static let itemSpacing: CGFloat = 4
+
+    private static var preferredWidth: CGFloat {
+        let itemCount = CGFloat(Tool.allCases.count + 4) // Tools, spacer, restore, settings, exit.
+        let buttonCount = itemCount - 1
+        let buttonWidthTotal = buttonCount * buttonWidth
+        let spacingTotal = (itemCount - 1) * itemSpacing
+        return buttonWidthTotal + 10 + spacingTotal + edgeInset * 2
+    }
+
+    let view = NSView(frame: CGRect(x: 0, y: 0, width: ToolbarController.preferredWidth, height: 46))
 
     var onTool: ((Tool) -> Void)?
     var onRestore: (() -> Void)?

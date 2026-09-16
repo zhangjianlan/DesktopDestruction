@@ -242,6 +242,22 @@ enum PersonSpecies: CaseIterable {
     case runner
     case dancer
     case zombie
+    case woman
+    case blondeWoman
+    case redHairWoman
+    case businessWoman
+    case scientistWoman
+    case astronautWoman
+    case singerWoman
+    case teacherWoman
+    case pregnantWoman
+    case princess
+    case blackWoman
+    case blackMan
+    case blackWalker
+    case blackRunner
+    case blackDancer
+    case blackHero
     case astronaut
     case wizard
     case hero
@@ -255,6 +271,22 @@ enum PersonSpecies: CaseIterable {
         case .runner: return "🏃"
         case .dancer: return "💃"
         case .zombie: return "🧟"
+        case .woman: return "👩"
+        case .blondeWoman: return "👱‍♀️"
+        case .redHairWoman: return "👩‍🦰"
+        case .businessWoman: return "👩‍💼"
+        case .scientistWoman: return "👩‍🔬"
+        case .astronautWoman: return "👩‍🚀"
+        case .singerWoman: return "👩‍🎤"
+        case .teacherWoman: return "👩‍🏫"
+        case .pregnantWoman: return "🤰"
+        case .princess: return "👸"
+        case .blackWoman: return "👩🏿"
+        case .blackMan: return "👨🏿"
+        case .blackWalker: return "🚶🏿"
+        case .blackRunner: return "🏃🏿"
+        case .blackDancer: return "💃🏿"
+        case .blackHero: return "🦸🏿"
         case .astronaut: return "🧑‍🚀"
         case .wizard: return "🧙"
         case .hero: return "🦸"
@@ -274,6 +306,38 @@ enum PersonSpecies: CaseIterable {
             return personTraits(speed: 42, movement: .dance, hitRadius: 33, bodySize: 57)
         case .zombie:
             return personTraits(speed: 30, movement: .chase, hitRadius: 35, bodySize: 60)
+        case .woman:
+            return personTraits(speed: 42, movement: .walk, hitRadius: 34, bodySize: 58)
+        case .blondeWoman:
+            return personTraits(speed: 48, movement: .walk, hitRadius: 34, bodySize: 58)
+        case .redHairWoman:
+            return personTraits(speed: 44, movement: .walk, hitRadius: 34, bodySize: 58)
+        case .businessWoman:
+            return personTraits(speed: 76, movement: .walk, hitRadius: 34, bodySize: 58)
+        case .scientistWoman:
+            return personTraits(speed: 52, movement: .walk, hitRadius: 34, bodySize: 58, trail: .magic)
+        case .astronautWoman:
+            return personTraits(speed: 47, movement: .moonwalk, hitRadius: 36, bodySize: 62)
+        case .singerWoman:
+            return personTraits(speed: 58, movement: .dance, hitRadius: 33, bodySize: 57)
+        case .teacherWoman:
+            return personTraits(speed: 49, movement: .walk, hitRadius: 34, bodySize: 58)
+        case .pregnantWoman:
+            return personTraits(speed: 31, movement: .waddle, hitRadius: 37, bodySize: 62)
+        case .princess:
+            return personTraits(speed: 53, movement: .walk, hitRadius: 34, bodySize: 59, trail: .magic)
+        case .blackWoman:
+            return personTraits(speed: 43, movement: .walk, hitRadius: 34, bodySize: 58)
+        case .blackMan:
+            return personTraits(speed: 45, movement: .walk, hitRadius: 35, bodySize: 59)
+        case .blackWalker:
+            return personTraits(speed: 38, movement: .walk, hitRadius: 34, bodySize: 58)
+        case .blackRunner:
+            return personTraits(speed: 130, movement: .run, hitRadius: 35, bodySize: 60)
+        case .blackDancer:
+            return personTraits(speed: 42, movement: .dance, hitRadius: 33, bodySize: 57)
+        case .blackHero:
+            return personTraits(speed: 108, movement: .run, hitRadius: 36, bodySize: 61)
         case .astronaut:
             return personTraits(speed: 47, movement: .moonwalk, hitRadius: 36, bodySize: 62)
         case .wizard:
@@ -309,6 +373,22 @@ enum PersonSpecies: CaseIterable {
             deathRadius: hitRadius * 2.35,
             leavesTrail: trail
         )
+    }
+
+    var spawnWeight: Int {
+        switch self {
+        case .woman, .blondeWoman, .redHairWoman, .businessWoman, .scientistWoman,
+             .astronautWoman, .singerWoman, .teacherWoman, .pregnantWoman, .princess,
+             .blackWoman, .blackMan, .blackWalker, .blackRunner, .blackDancer, .blackHero:
+            return 2
+        default:
+            return 1
+        }
+    }
+
+    static func randomSpawn() -> PersonSpecies {
+        let weighted = allCases.flatMap { Array(repeating: $0, count: $0.spawnWeight) }
+        return weighted.randomElement() ?? .walker
     }
 }
 
@@ -527,8 +607,15 @@ final class CreatureActor {
     let id = UUID()
     let kind: CreatureKind
     let layer = CALayer()
-    let traits: CreatureTraits
+    private(set) var traits: CreatureTraits
     private(set) var isAlive = true
+    private(set) var zombieTier = 0
+    private(set) var evolutionStage = 0
+    private var maximumHealth: CGFloat = 1
+    private var currentHealth: CGFloat = 1
+    private var panicUntil: Date?
+    private var panicFrom = CGPoint.zero
+    private let baseTraits: CreatureTraits
 
     private var position: CGPoint
     private var heading: CGFloat
@@ -561,7 +648,8 @@ final class CreatureActor {
     init(at point: CGPoint, kind: CreatureKind) {
         self.kind = kind
         self.position = point
-        self.traits = kind.traits
+        self.baseTraits = kind.traits
+        self.traits = baseTraits
         var state = UInt32.random(in: 1...UInt32.max)
         heading = Self.nextNavigationValue(&state) * 2 * .pi
         navigationTargetHeading = heading
@@ -572,9 +660,17 @@ final class CreatureActor {
         layer.contentsScale = 2
         layer.position = point
         layer.zPosition = kind.isVehicle ? 78 : (kind.isAnimal ? 76 : (kind.isPerson ? 73 : 72))
+        maximumHealth = initialHealth
+        currentHealth = maximumHealth
+        if case .person(.zombie) = kind {
+            infect()
+        }
     }
 
     private var kindEmoji: String {
+        if isZombie {
+            return "🧟"
+        }
         switch kind {
         case .insect(let species): return species.emoji
         case .person(let species): return species.emoji
@@ -584,18 +680,138 @@ final class CreatureActor {
         }
     }
 
+    var isZombie: Bool {
+        zombieTier > 0
+    }
+
+    var canInfect: Bool {
+        kind.isPerson || kind.isAnimal
+    }
+
+    var destructionPower: CGFloat {
+        guard isZombie else { return 0 }
+        return CGFloat(zombieTier * zombieTier) * 6
+    }
+
+    private var initialHealth: CGFloat {
+        if kind.isPerson { return 3 }
+        if kind.isAnimal { return max(2, traits.bodySize / 34) }
+        if kind.isInsect { return 1 }
+        return 1
+    }
+
+    @discardableResult
+    func applyDamage(_ amount: CGFloat, from attackPoint: CGPoint) -> Bool {
+        guard isAlive else { return false }
+        guard zombieTier > 0 || canInfect else { return true }
+        currentHealth -= max(0, amount)
+        if currentHealth <= 0 {
+            return true
+        }
+        if !isZombie {
+            flee(from: attackPoint)
+        }
+        return false
+    }
+
+    func flee(from point: CGPoint, now: Date = Date()) {
+        guard isAlive, canInfect, !isZombie else { return }
+        panicFrom = point
+        panicUntil = now.addingTimeInterval(1.25)
+        navigationWaypoint = nil
+        nextTurn = .distantPast
+    }
+
+    func infect() {
+        guard isAlive, canInfect, !isZombie else { return }
+        zombieTier = 1
+        applyZombieTraits()
+    }
+
+    func promoteZombieTier() {
+        guard isZombie else { return }
+        zombieTier += 1
+        applyZombieTraits()
+    }
+
+    func evolve() {
+        guard isAlive, kind.isAnimal, !isZombie, evolutionStage < 8 else { return }
+        evolutionStage += 1
+        let growth = CGFloat(pow(1.13, Double(evolutionStage)))
+        traits = CreatureTraits(
+            speed: min(260, baseTraits.speed * (1 + CGFloat(evolutionStage) * 0.09)),
+            turnInterval: baseTraits.turnInterval,
+            turnJitter: baseTraits.turnJitter,
+            biteInterval: max(0.42, baseTraits.biteInterval * 0.9),
+            biteRadius: min(34, baseTraits.biteRadius * growth),
+            biteShape: baseTraits.biteShape,
+            hitRadius: min(145, baseTraits.hitRadius * growth),
+            bodySize: min(230, baseTraits.bodySize * growth),
+            movement: baseTraits.movement,
+            deathRadius: min(145, baseTraits.deathRadius * growth),
+            leavesTrail: baseTraits.leavesTrail,
+            explosionRadius: baseTraits.explosionRadius,
+            deathEffect: baseTraits.deathEffect
+        )
+        maximumHealth = max(3, traits.bodySize / 26)
+        currentHealth = maximumHealth
+        updateAppearance()
+    }
+
+    private func applyZombieTraits() {
+        let tier = max(1, zombieTier)
+        let growth = CGFloat(pow(1.34, Double(tier - 1)))
+        let bodySize = min(320, max(58, baseTraits.bodySize * 0.95 * growth))
+        let hitRadius = min(185, bodySize * 0.55)
+        let biteRadius = min(52, max(10, baseTraits.biteRadius * growth * 1.25))
+        traits = CreatureTraits(
+            speed: max(9, 27 / (1 + CGFloat(tier - 1) * 0.1)),
+            turnInterval: 0.85,
+            turnJitter: 0.4,
+            biteInterval: max(0.38, 0.72 / growth),
+            biteRadius: biteRadius,
+            biteShape: .venom,
+            hitRadius: hitRadius,
+            bodySize: bodySize,
+            movement: .chase,
+            deathRadius: min(210, bodySize * 1.1),
+            leavesTrail: nil,
+            explosionRadius: 0,
+            deathEffect: .blood
+        )
+        maximumHealth = max(8, 8 * CGFloat(pow(1.55, Double(tier - 1))))
+        currentHealth = maximumHealth
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.bounds = CGRect(x: 0, y: 0, width: traits.bodySize, height: traits.bodySize)
+        if isZombie, zombieTier >= 3, let image = ArtAssets.image(named: "creature-giant-zombie") {
+            layer.contents = image
+        } else {
+            layer.contents = IconRenderer.emoji(kindEmoji, size: traits.bodySize * 0.82)
+        }
+        layer.zPosition = isZombie ? 79 : (kind.isVehicle ? 78 : (kind.isAnimal ? 76 : (kind.isPerson ? 73 : 72)))
+        CATransaction.commit()
+    }
+
     func update(
         now: Date,
         canvas: DestructionCanvas,
         bounds: CGRect,
         threat: CGPoint?,
-        others: [CreatureActor]
+        others: [CreatureActor],
+        walls: [WallEntity]
     ) -> Bool {
         guard isAlive else { return false }
         let dt = min(0.1, max(0.005, now.timeIntervalSince(lastUpdateTime)))
         lastUpdateTime = now
         guard updateBurning(now: now, canvas: canvas) else { return false }
+        let previousPosition = position
         updateMotion(now: now, dt: dt, bounds: bounds, threat: threat, others: others)
+        resolveWallCollisions(previousPosition: previousPosition, walls: walls)
         keepInside(bounds: bounds)
         updateLayer()
         let persistentDamageChance: CGFloat
@@ -607,7 +823,6 @@ final class CreatureActor {
         default:
             persistentDamageChance = 0.28
         }
-        biteIfReady(now: now, canvas: canvas, chance: persistentDamageChance)
         leaveTrailIfReady(now: now, canvas: canvas, chance: persistentDamageChance)
         return true
     }
@@ -621,6 +836,17 @@ final class CreatureActor {
     ) {
         navigationPhase += CGFloat(dt)
         let time = navigationPhase + navigationPhaseOffset
+
+        if let panicUntil, now < panicUntil {
+            navigationWaypoint = nil
+            nextTurn = .distantPast
+            navigationTargetHeading = atan2(position.y - panicFrom.y, position.x - panicFrom.x)
+            let headingDelta = shortestAngle(from: heading, to: navigationTargetHeading)
+            heading = normalizedAngle(heading + min(abs(headingDelta), 5.2 * CGFloat(dt)) * (headingDelta < 0 ? -1 : 1))
+            position.x += cos(heading) * traits.speed * 1.85 * CGFloat(dt)
+            position.y += sin(heading) * traits.speed * 1.85 * CGFloat(dt)
+            return
+        }
 
         if navigationWaypoint == nil {
             retargetNavigation(jitter: traits.turnJitter, bounds: bounds, now: now)
@@ -706,9 +932,10 @@ final class CreatureActor {
             heading = normalizedAngle(navigationTargetHeading + sin(time * 1.7) * 0.5)
             speed *= 0.55 + abs(cos(time * 2.4)) * 0.45
         case .chase:
-            if let target = nearestTarget(in: others, now: now) {
+            if let target = nearestTarget(in: others, now: now, isEligible: chaseTargetFilter) {
                 heading = atan2(target.y - position.y, target.x - position.x)
-                speed *= 1.2
+                navigationWaypoint = target
+                speed *= isZombie ? 0.85 : 1.2
             }
         case .moonwalk:
             if now >= nextAction {
@@ -848,14 +1075,27 @@ final class CreatureActor {
         return delta
     }
 
-    private func nearestTarget(in others: [CreatureActor], now: Date) -> CGPoint? {
+    private func chaseTargetFilter(_ other: CreatureActor) -> Bool {
+        guard other.isAlive, other.id != id, !other.kind.isVehicle else { return false }
+        if isZombie {
+            if !other.isZombie && other.canInfect { return true }
+            return other.isZombie && other.zombieTier == zombieTier
+        }
+        return true
+    }
+
+    private func nearestTarget(
+        in others: [CreatureActor],
+        now: Date,
+        isEligible: (CreatureActor) -> Bool
+    ) -> CGPoint? {
         if now < nextTargetSearch {
             return cachedTarget
         }
         nextTargetSearch = now.addingTimeInterval(0.25)
         cachedTarget = nil
         var nearest: (point: CGPoint, distance: CGFloat)?
-        for other in others where other.isAlive && other.id != id {
+        for other in others where isEligible(other) {
             let target = other.position
             let distance = distance(to: target)
             if distance < 300 && (nearest == nil || distance < nearest!.distance) {
@@ -885,6 +1125,19 @@ final class CreatureActor {
         }
     }
 
+    private func resolveWallCollisions(previousPosition: CGPoint, walls: [WallEntity]) {
+        guard !walls.isEmpty else { return }
+        guard !(isZombie && zombieTier >= 2) else { return }
+        for wall in walls where wall.isAlive {
+            guard wall.hitTest(position: position, radius: traits.hitRadius * 0.72) else { continue }
+            position = previousPosition
+            heading = normalizedAngle(.pi - heading)
+            navigationWaypoint = nil
+            nextTurn = .distantPast
+            return
+        }
+    }
+
     private func updateLayer() {
         layer.position = position
         if kind.isPerson || kind.isAnimal || kind.isVehicle {
@@ -895,7 +1148,30 @@ final class CreatureActor {
         }
     }
 
-    private func biteIfReady(now: Date, canvas: DestructionCanvas, chance: CGFloat) {
+    func creatureBiteTargetIfReady(now: Date, others: [CreatureActor]) -> CreatureActor? {
+        guard isAlive, traits.biteInterval > 0, now >= nextBite else { return nil }
+        guard isZombie || kind.isAnimal else { return nil }
+
+        var nearest: (actor: CreatureActor, distance: CGFloat)?
+        for target in others where target.isAlive && target.id != id {
+            let eligible = isZombie
+                ? (!target.isZombie && target.canInfect)
+                : (target.canInfect && !target.isZombie)
+            guard eligible else { continue }
+            let targetDistance = distance(to: target.position)
+            let reach = traits.biteRadius + traits.hitRadius + target.traits.hitRadius
+            guard targetDistance <= reach else { continue }
+            if nearest == nil || targetDistance < nearest!.distance {
+                nearest = (target, targetDistance)
+            }
+        }
+
+        guard let target = nearest?.actor else { return nil }
+        nextBite = now.addingTimeInterval(traits.biteInterval * nextNavigationInterval(0.85...1.15))
+        return target
+    }
+
+    func biteDesktopIfReady(now: Date, canvas: DestructionCanvas, chance: CGFloat) {
         guard traits.biteInterval > 0, traits.biteRadius > 0, now >= nextBite else { return }
         nextBite = now.addingTimeInterval(traits.biteInterval * nextNavigationInterval(0.8...1.2))
         guard CGFloat.random(in: 0...1) < chance else { return }
@@ -988,7 +1264,7 @@ final class CreatureActor {
         switch traits.deathEffect {
         case .blood:
             if let blood = DamageRenderer.renderBloodSplat(at: position, radius: traits.deathRadius) {
-                canvas.addDamage(image: blood.0, frame: blood.1)
+                canvas.addDamage(image: blood.0, frame: blood.1, permanent: true)
             }
         case .debris:
             if let debris = DamageRenderer.renderScorch(at: position, radius: traits.deathRadius * 0.65) {
@@ -1061,7 +1337,9 @@ final class CreatureActor {
         guard kind.isPerson || kind.isAnimal else { return }
         if kind.isPerson {
             AudioManager.shared.play(
-                burning ? "person_burn_death" : "person_death",
+                burning
+                    ? "person_burn_death"
+                    : (Bool.random() ? "person_death_oh" : "person_death_ah"),
                 gain: 0.92,
                 rate: Float.random(in: 0.96...1.08),
                 minimumInterval: 0.045

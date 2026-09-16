@@ -34,8 +34,10 @@ DARK_BROWN = (87, 66, 42, 255)
 
 
 class Art:
-    def __init__(self) -> None:
-        self.image = Image.new("RGBA", (CANVAS, CANVAS), (0, 0, 0, 0))
+    def __init__(self, width: int = SIZE, height: int = SIZE) -> None:
+        self.width = width
+        self.height = height
+        self.image = Image.new("RGBA", (width * SCALE, height * SCALE), (0, 0, 0, 0))
         self.draw = ImageDraw.Draw(self.image, "RGBA")
 
     @staticmethod
@@ -136,7 +138,10 @@ class Art:
 
     def save(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.image.resize((SIZE, SIZE), Image.Resampling.LANCZOS).save(path)
+        self.image.resize(
+            (self.width, self.height),
+            Image.Resampling.LANCZOS,
+        ).save(path)
 
 
 def draw_hammer(art: Art) -> None:
@@ -235,6 +240,98 @@ def draw_rocket(art: Art) -> None:
     art.ellipse((111, 126, 34, 34), BLUE)
     art.polygon([(98, 74), (62, 42), (98, 42)], fill=DARK_RED)
     art.polygon([(158, 74), (194, 42), (158, 42)], fill=DARK_RED)
+
+
+def draw_nuke(art: Art) -> None:
+    art.rounded((104, 38, 48, 150), 24, (56, 66, 81, 255))
+    art.rounded((114, 62, 28, 84), 14, YELLOW)
+    art.polygon([(98, 184), (128, 228), (158, 184)], fill=(31, 41, 55, 255))
+    art.polygon([(104, 68), (64, 34), (104, 38)], fill=DARK_RED)
+    art.polygon([(152, 68), (192, 34), (152, 38)], fill=DARK_RED)
+    art.line([(128, 184), (128, 224)], ORANGE, 18)
+    art.ellipse((118, 220, 20, 18), YELLOW, width=6)
+
+    center = (128, 112)
+    for index in range(3):
+        angle = math.pi / 2 + index * 2 * math.pi / 3
+        next_angle = angle + 2 * math.pi / 9
+        art.polygon(
+            [
+                center,
+                (
+                    center[0] + math.cos(angle) * 22,
+                    center[1] + math.sin(angle) * 22,
+                ),
+                (
+                    center[0] + math.cos(next_angle) * 22,
+                    center[1] + math.sin(next_angle) * 22,
+                ),
+            ],
+            fill=YELLOW,
+            outline=None,
+        )
+    art.ellipse((118, 102, 20, 20), YELLOW, width=7)
+
+
+def draw_wall(art: Art) -> None:
+    brick = (191, 93, 68, 255)
+    dark_brick = (146, 64, 45, 255)
+    for x in range(4):
+        art.rounded(
+            (20 + x * 120, 11, 112, 30),
+            6,
+            brick if x % 2 == 0 else dark_brick,
+            width=6,
+        )
+    for x in range(5):
+        art.rounded(
+            (35 + x * 90, 47, 82, 30),
+            6,
+            dark_brick if x % 2 == 0 else brick,
+            width=6,
+        )
+    art.rounded((8, 4, 496, 80), 8, (0, 0, 0, 0), outline=OUTLINE, width=6)
+
+
+def draw_wall_icon(art: Art) -> None:
+    art.rounded((44, 74, 168, 108), 12, (191, 93, 68, 255))
+    art.rounded((56, 86, 54, 24), 6, (146, 64, 45, 255), outline=None)
+    art.rounded((120, 92, 66, 24), 6, (146, 64, 45, 255), outline=None)
+    art.rounded((56, 134, 132, 24), 8, (120, 72, 24, 255))
+    art.rounded((68, 124, 30, 18), 5, LIGHT_GRAY)
+    art.star((206, 176), 22, 9, 8, fill=YELLOW)
+
+
+def draw_giant_zombie(art: Art) -> None:
+    zombie_green = (74, 222, 128, 255)
+    dark_zombie = (22, 101, 52, 255)
+    art.ellipse((48, 54, 160, 148), zombie_green)
+    art.ellipse((64, 186, 128, 44), dark_zombie)
+    art.ellipse((88, 96, 22, 26), WHITE, width=6)
+    art.ellipse((148, 96, 22, 26), WHITE, width=6)
+    art.ellipse((94, 102, 10, 14), OUTLINE, outline=None)
+    art.ellipse((154, 102, 10, 14), OUTLINE, outline=None)
+    art.polygon([(96, 146), (160, 146), (128, 180)], fill=OUTLINE)
+    art.polygon([(100, 146), (156, 146), (150, 156), (106, 156)], fill=WHITE, outline=None)
+    art.line([(84, 56), (72, 26)], DARK_RED, 13)
+    art.line([(172, 56), (184, 26)], DARK_RED, 13)
+    art.line([(88, 68), (126, 84)], OUTLINE, 7)
+
+
+def draw_evolution(art: Art) -> None:
+    art.star((128, 128), 110, 43, 12, fill=YELLOW)
+    art.star((128, 128), 72, 29, 10, fill=WHITE, width=7)
+    for point in [(56, 128), (200, 128), (128, 56), (128, 200)]:
+        art.star(point, 17, 7, 8, fill=ORANGE, width=5)
+
+
+def draw_zombie_bite(art: Art) -> None:
+    art.ellipse((48, 82, 160, 104), (74, 222, 128, 215))
+    for index in range(5):
+        x = 70 + index * 28
+        art.polygon([(x, 112), (x + 12, 146), (x + 24, 112)], fill=WHITE, width=5)
+    art.ellipse((82, 92, 26, 22), DARK_RED, outline=None)
+    art.ellipse((150, 96, 20, 18), DARK_RED, outline=None)
 
 
 def draw_fist(art: Art) -> None:
@@ -436,6 +533,8 @@ ASSETS: dict[str, Callable[[Art], None]] = {
     "tool-bomb": draw_bomb,
     "tool-eraser": draw_eraser,
     "tool-rocket": draw_rocket,
+    "tool-nuke": draw_nuke,
+    "tool-wall": draw_wall_icon,
     "tool-fist": draw_fist,
     "tool-insect": draw_insect,
     "tool-person": draw_person,
@@ -459,6 +558,15 @@ ASSETS: dict[str, Callable[[Art], None]] = {
     "effect-mushroom-cloud": draw_mushroom_cloud,
     "effect-blood-splat": draw_blood_splat,
     "effect-steam": draw_steam,
+    "wall-brick": draw_wall,
+    "creature-giant-zombie": draw_giant_zombie,
+    "effect-evolution": draw_evolution,
+    "effect-zombie-bite": draw_zombie_bite,
+}
+
+
+ASSET_SIZES: dict[str, tuple[int, int]] = {
+    "wall-brick": (512, 88),
 }
 
 
@@ -474,7 +582,8 @@ def main() -> None:
 
     output = Path(args.output)
     for name, draw in sorted(ASSETS.items()):
-        art = Art()
+        size = ASSET_SIZES.get(name, (SIZE, SIZE))
+        art = Art(width=size[0], height=size[1])
         draw(art)
         art.save(output / f"{name}.png")
         print(f"Generated {name}.png")

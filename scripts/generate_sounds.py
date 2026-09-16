@@ -189,6 +189,32 @@ def generate():
         person_death.append((voice + breath) * envelope)
     write_wav("person_death", normalize(person_death, 0.78))
 
+    person_death_oh = []
+    for index in range(seconds(0.44)):
+        time = index / SAMPLE_RATE
+        progress = time / 0.44
+        frequency = 208 - 34 * progress
+        voice = math.sin(2 * math.pi * frequency * time) * 0.5
+        voice += math.sin(2 * math.pi * frequency * 2.04 * time) * 0.16
+        voice += math.sin(2 * math.pi * frequency * 3.4 * time) * 0.05
+        breath = lowpass([rng.uniform(-1, 1)], 5)[-1] * 0.12
+        envelope = min(1, time / 0.035) * math.exp(-time * 3.8) * (1 - progress * 0.2)
+        person_death_oh.append((voice + breath) * envelope)
+    write_wav("person_death_oh", normalize(person_death_oh, 0.78))
+
+    person_death_ah = []
+    for index in range(seconds(0.5)):
+        time = index / SAMPLE_RATE
+        progress = time / 0.5
+        frequency = 326 - 154 * progress
+        voice = math.sin(2 * math.pi * frequency * time) * 0.47
+        voice += math.sin(2 * math.pi * frequency * 1.94 * time) * 0.18
+        voice += math.sin(2 * math.pi * frequency * 3.12 * time) * 0.07
+        breath = lowpass([rng.uniform(-1, 1)], 3)[-1] * 0.15
+        envelope = min(1, time / 0.018) * math.exp(-time * 3.5)
+        person_death_ah.append((voice + breath) * envelope)
+    write_wav("person_death_ah", normalize(person_death_ah, 0.78))
+
     animal_death = []
     for index in range(seconds(0.54)):
         time = index / SAMPLE_RATE
