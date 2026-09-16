@@ -27,7 +27,6 @@ swift build
 ./scripts/build_app.sh x86_64
 ```
 
-脚本会优先使用钥匙串里的 Apple Development 证书签名。没有证书时才退回 ad-hoc 签名。
 
 安装到固定路径（推荐，避免 TCC 权限随路径漂移）：
 
