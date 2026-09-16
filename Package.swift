@@ -9,6 +9,11 @@ let package = Package(
             name: "DesktopDestruction",
             path: "Sources/DesktopDestruction",
             resources: [.copy("Resources")]
+        ),
+        .testTarget(
+            name: "DesktopDestructionTests",
+            dependencies: ["DesktopDestruction"],
+            path: "Tests/DesktopDestructionTests"
         )
     ]
 )

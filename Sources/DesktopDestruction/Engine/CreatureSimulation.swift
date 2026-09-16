@@ -633,6 +633,7 @@ final class CreatureActor {
     private var nextTrail = Date().addingTimeInterval(0.2)
     private var nextAction = Date().addingTimeInterval(0.3)
     private var actionActiveUntil: Date?
+    private var actionSystem = CreatureActionSystem()
     private var lastUpdateTime = Date()
     private var cachedTarget: CGPoint?
     private var nextTargetSearch = Date()
@@ -749,9 +750,13 @@ final class CreatureActor {
             return true
         }
         if kind.isVehicle {
+            actionSystem.begin(.hit, duration: 0.13)
             updateVehicleDamageAppearance()
         } else if !isZombie {
+            actionSystem.begin(.hit, duration: 0.18)
             flee(from: attackPoint)
+        } else {
+            actionSystem.begin(.hit, duration: 0.15)
         }
         return false
     }
@@ -1022,6 +1027,22 @@ final class CreatureActor {
         updateMotion(now: now, dt: dt, bounds: bounds, threat: threat, others: others)
         resolveWallCollisions(previousPosition: previousPosition, walls: walls)
         keepInside(bounds: bounds)
+        let actualSpeed = hypot(
+            position.x - previousPosition.x,
+            position.y - previousPosition.y
+        ) / CGFloat(dt)
+        _ = actionSystem.update(
+            dt: dt,
+            context: CreatureActionContext(
+                movement: traits.movement,
+                actualSpeed: actualSpeed,
+                baseSpeed: traits.speed,
+                isBurning: isBurning,
+                isPanicking: panicUntil.map { now < $0 } == true,
+                isZombie: isZombie,
+                isVehicle: kind.isVehicle
+            )
+        )
         updateLayer()
         let persistentDamageChance: CGFloat
         switch others.count {
@@ -1350,12 +1371,15 @@ final class CreatureActor {
 
     private func updateLayer() {
         layer.position = position
-        if kind.isPerson || kind.isAnimal || kind.isVehicle {
-            let facingLeft = cos(heading) < 0
-            layer.setAffineTransform(CGAffineTransform(scaleX: facingLeft ? -1 : 1, y: 1))
-        } else {
-            layer.setAffineTransform(CGAffineTransform(rotationAngle: heading))
-        }
+        let upright = kind.isPerson || kind.isAnimal || kind.isVehicle
+        layer.setAffineTransform(
+            actionSystem.transform(
+                heading: heading,
+                bodySize: traits.bodySize,
+                rotatesWithHeading: !upright,
+                facingLeft: cos(heading) < 0
+            )
+        )
     }
 
     func creatureBiteTargetIfReady(now: Date, others: [CreatureActor]) -> CreatureActor? {
@@ -1378,6 +1402,7 @@ final class CreatureActor {
 
         guard let target = nearest?.actor else { return nil }
         nextBite = now.addingTimeInterval(traits.biteInterval * nextNavigationInterval(0.85...1.15))
+        actionSystem.begin(.bite, duration: 0.24)
         return target
     }
 
@@ -1385,6 +1410,7 @@ final class CreatureActor {
         guard traits.biteInterval > 0, traits.biteRadius > 0, now >= nextBite else { return }
         nextBite = now.addingTimeInterval(traits.biteInterval * nextNavigationInterval(0.8...1.2))
         guard CGFloat.random(in: 0...1) < chance else { return }
+        actionSystem.begin(.bite, duration: 0.2)
         let chewCenter = navigationWaypoint ?? position
         let biteJitter = traits.biteRadius * 0.24
         let bitePoint = CGPoint(
@@ -1442,6 +1468,7 @@ final class CreatureActor {
                 ? Double.random(in: 0.75...1.5)
                 : (kind.isInsect ? Double.random(in: 0.5...0.85) : Double.random(in: 0.35...0.7)))
         burnStartedAt = now
+        actionSystem.begin(.burning, duration: 0.2)
         burnEmitter = ParticleFactory.creatureFire(attachedTo: layer)
     }
 
