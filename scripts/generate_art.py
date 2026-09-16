@@ -219,6 +219,78 @@ def draw_flame(art: Art) -> None:
     art.ellipse((107, 130, 42, 58), WHITE, width=6)
 
 
+def draw_explosion(art: Art) -> None:
+    art.star((256, 256), 238, 88, 18, fill=(127, 29, 29, 255))
+    art.star((256, 256), 200, 76, 16, fill=ORANGE)
+    art.star((256, 256), 146, 58, 14, fill=YELLOW)
+    art.ellipse((212, 212, 88, 88), WHITE, width=8)
+
+    for center, radius in [((64, 108), 28), ((434, 128), 33), ((92, 392), 31), ((410, 390), 26)]:
+        art.star(center, radius, radius * 0.38, 9, fill=YELLOW, width=7)
+
+    art.ellipse(
+        (32, 32, 448, 448),
+        (255, 255, 255, 0),
+        outline=(255, 255, 255, 105),
+        width=15,
+    )
+
+
+def draw_fire(art: Art) -> None:
+    art.polygon(
+        [
+            (256, 26),
+            (329, 130),
+            (430, 169),
+            (383, 264),
+            (430, 358),
+            (339, 419),
+            (256, 485),
+            (169, 410),
+            (85, 348),
+            (126, 254),
+            (78, 160),
+            (180, 126),
+        ],
+        fill=(190, 36, 36, 255),
+    )
+    art.polygon(
+        [
+            (256, 82),
+            (321, 168),
+            (382, 210),
+            (347, 282),
+            (377, 341),
+            (309, 385),
+            (256, 438),
+            (196, 376),
+            (135, 331),
+            (163, 268),
+            (127, 202),
+            (191, 160),
+        ],
+        fill=ORANGE,
+        width=9,
+    )
+    art.polygon(
+        [
+            (256, 146),
+            (314, 232),
+            (342, 296),
+            (299, 345),
+            (256, 392),
+            (210, 340),
+            (169, 289),
+            (198, 226),
+        ],
+        fill=YELLOW,
+        width=8,
+    )
+    art.ellipse((224, 268, 64, 96), WHITE, width=8)
+    for point, radius in [((82, 96), 18), ((426, 96), 20), ((72, 420), 16), ((434, 418), 18)]:
+        art.star(point, radius, radius * 0.4, 8, fill=YELLOW, width=6)
+
+
 def draw_bomb(art: Art) -> None:
     art.ellipse((66, 40, 124, 30), (0, 0, 0, 42), outline=None)
     art.ellipse((58, 58, 140, 140), (23, 23, 23, 255))
@@ -424,16 +496,6 @@ def draw_exit(art: Art) -> None:
     art.line([(188, 68), (68, 188)], RED, 26)
 
 
-def draw_explosion(art: Art) -> None:
-    art.star((128, 128), 116, 54, 14, fill=ORANGE)
-    art.star((128, 128), 78, 38, 12, fill=YELLOW, width=8)
-    art.ellipse((96, 96, 64, 64), WHITE, width=6)
-
-
-def draw_fire(art: Art) -> None:
-    draw_flame(art)
-
-
 def draw_smoke(art: Art) -> None:
     art.ellipse((44, 82, 82, 72), (107, 114, 128, 230))
     art.ellipse((104, 106, 96, 84), (148, 155, 166, 235))
@@ -489,15 +551,140 @@ def draw_muzzle_flash(art: Art) -> None:
 
 
 def draw_shockwave(art: Art) -> None:
-    art.ellipse((30, 30, 196, 196), (255, 255, 255, 60), outline=(255, 255, 255, 235), width=12)
-    art.ellipse((62, 62, 132, 132), None, outline=(255, 255, 255, 100), width=7)
+    art.ellipse(
+        (26, 26, 460, 460),
+        (255, 255, 255, 28),
+        outline=(255, 255, 255, 238),
+        width=24,
+    )
+    art.ellipse(
+        (92, 92, 328, 328),
+        (255, 255, 255, 0),
+        outline=(255, 226, 150, 125),
+        width=14,
+    )
+    art.ellipse(
+        (142, 142, 228, 228),
+        (255, 255, 255, 0),
+        outline=(255, 255, 255, 78),
+        width=10,
+    )
 
 
 def draw_mushroom_cloud(art: Art) -> None:
-    art.rounded((100, 30, 56, 92), 25, GRAY)
-    art.ellipse((40, 92, 176, 112), GRAY)
-    art.ellipse((66, 128, 124, 52), (178, 185, 195, 255), outline=None)
-    art.star((128, 104), 52, 24, 12, fill=ORANGE, width=7)
+    art.polygon(
+        [(214, 62), (298, 62), (324, 124), (330, 184), (182, 184), (188, 124)],
+        fill=(107, 114, 128, 255),
+    )
+    art.rounded((196, 168, 120, 42), 20, (75, 85, 99, 255))
+    art.ellipse((48, 208, 416, 168), GRAY)
+    art.ellipse((78, 224, 220, 112), (178, 185, 195, 255), outline=None)
+    art.ellipse((224, 226, 218, 108), (148, 155, 166, 255), outline=None)
+    art.ellipse((122, 288, 274, 82), (203, 213, 225, 235), outline=None)
+    art.ellipse((186, 330, 142, 56), (107, 114, 128, 235), outline=None)
+    art.star((256, 246), 145, 60, 16, fill=ORANGE, width=10)
+    art.star((256, 250), 88, 36, 12, fill=YELLOW, width=8)
+    for point, radius in [((86, 318), 19), ((420, 312), 21), ((152, 398), 16), ((360, 396), 18)]:
+        art.star(point, radius, radius * 0.4, 9, fill=(249, 115, 22, 190), width=6)
+
+
+def draw_zombie_tier(art: Art, tier: int) -> None:
+    palettes = [
+        ((94, 234, 112, 255), (22, 101, 52, 255), (31, 41, 55, 255)),
+        ((88, 214, 100, 255), (20, 83, 45, 255), (17, 24, 39, 255)),
+        ((74, 187, 88, 255), (20, 83, 45, 255), (15, 23, 42, 255)),
+        ((56, 151, 72, 255), (6, 78, 59, 255), (15, 23, 42, 255)),
+        ((34, 116, 58, 255), (6, 78, 59, 255), (2, 6, 23, 255)),
+    ]
+    skin, dark_skin, cloth = palettes[min(tier, 5) - 1]
+    scale = 0.72 + tier * 0.07
+
+    body_width = 196 * scale
+    body_height = 148 * scale
+    body_x = 256 - body_width / 2
+    body_y = 216 - body_height / 2
+    art.rounded((body_x, body_y, body_width, body_height), 46 * scale, skin)
+    art.rounded(
+        (body_x + 22 * scale, body_y + body_height - 20 * scale, body_width - 44 * scale, 74 * scale),
+        24 * scale,
+        cloth,
+    )
+
+    head_width = 112 * scale
+    head_height = 104 * scale
+    head_x = 256 - head_width / 2
+    head_y = body_y - head_height + 20 * scale
+    art.ellipse((head_x, head_y, head_width, head_height), skin)
+
+    eye_color = WHITE if tier < 3 else (255, 214, 84, 255)
+    art.ellipse(
+        (head_x + 20 * scale, head_y + 34 * scale, 22 * scale, 24 * scale),
+        eye_color,
+        width=6,
+    )
+    art.ellipse(
+        (head_x + head_width - 42 * scale, head_y + 34 * scale, 22 * scale, 24 * scale),
+        eye_color,
+        width=6,
+    )
+    art.ellipse((head_x + 28 * scale, head_y + 41 * scale, 8 * scale, 9 * scale), OUTLINE, outline=None)
+    art.ellipse(
+        (head_x + head_width - 36 * scale, head_y + 41 * scale, 8 * scale, 9 * scale),
+        OUTLINE,
+        outline=None,
+    )
+    art.polygon(
+        [
+            (head_x + 28 * scale, head_y + 72 * scale),
+            (head_x + head_width - 28 * scale, head_y + 72 * scale),
+            (head_x + head_width / 2, head_y + 92 * scale),
+        ],
+        fill=OUTLINE,
+    )
+
+    arm_width = 46 * scale
+    arm_height = 148 * scale
+    art.rounded((body_x - arm_width + 10 * scale, body_y - 26 * scale, arm_width, arm_height), 22 * scale, skin)
+    art.rounded(
+        (body_x + body_width - 10 * scale, body_y - 26 * scale, arm_width, arm_height),
+        22 * scale,
+        skin,
+    )
+
+    if tier >= 2:
+        for index in range(3):
+            y = body_y + 34 * scale + index * 24 * scale
+            art.line(
+                [(body_x + 34 * scale, y), (body_x + body_width - 34 * scale, y)],
+                (239, 246, 255, 220),
+                9 * scale,
+            )
+        art.ellipse(
+            (body_x + body_width * 0.58, body_y + 18 * scale, 42 * scale, 32 * scale),
+            DARK_RED,
+            width=6,
+        )
+
+    if tier >= 3:
+        art.line([(head_x + 18 * scale, head_y - 8 * scale), (head_x - 8 * scale, head_y - 50 * scale)], YELLOW, 14 * scale)
+        art.line(
+            [
+                (head_x + head_width - 18 * scale, head_y - 8 * scale),
+                (head_x + head_width + 8 * scale, head_y - 50 * scale),
+            ],
+            YELLOW,
+            14 * scale,
+        )
+
+    if tier >= 4:
+        art.rounded((body_x + 16 * scale, body_y + 14 * scale, body_width - 32 * scale, 34 * scale), 14 * scale, dark_skin)
+        art.star((256, body_y + body_height + 30 * scale), 28 * scale, 12 * scale, 8, fill=YELLOW, width=6)
+
+    if tier >= 5:
+        art.line([(body_x + 32 * scale, body_y + 76 * scale), (body_x + body_width - 36 * scale, body_y + 92 * scale)], (163, 230, 53, 235), 10 * scale)
+        art.line([(body_x + 58 * scale, body_y + 116 * scale), (body_x + body_width - 60 * scale, body_y + 102 * scale)], (163, 230, 53, 235), 8 * scale)
+        art.line([(body_x - 18 * scale, body_y + 90 * scale), (body_x - 82 * scale, body_y + 30 * scale)], dark_skin, 20 * scale)
+        art.line([(body_x + body_width + 18 * scale, body_y + 90 * scale), (body_x + body_width + 82 * scale, body_y + 30 * scale)], dark_skin, 20 * scale)
 
 
 def draw_blood_splat(art: Art) -> None:
@@ -559,7 +746,12 @@ ASSETS: dict[str, Callable[[Art], None]] = {
     "effect-blood-splat": draw_blood_splat,
     "effect-steam": draw_steam,
     "wall-brick": draw_wall,
-    "creature-giant-zombie": draw_giant_zombie,
+    "creature-giant-zombie": lambda art: draw_zombie_tier(art, 5),
+    "creature-zombie-tier-1": lambda art: draw_zombie_tier(art, 1),
+    "creature-zombie-tier-2": lambda art: draw_zombie_tier(art, 2),
+    "creature-zombie-tier-3": lambda art: draw_zombie_tier(art, 3),
+    "creature-zombie-tier-4": lambda art: draw_zombie_tier(art, 4),
+    "creature-zombie-tier-5": lambda art: draw_zombie_tier(art, 5),
     "effect-evolution": draw_evolution,
     "effect-zombie-bite": draw_zombie_bite,
 }
@@ -567,6 +759,16 @@ ASSETS: dict[str, Callable[[Art], None]] = {
 
 ASSET_SIZES: dict[str, tuple[int, int]] = {
     "wall-brick": (512, 88),
+    "effect-explosion": (512, 512),
+    "effect-fire": (512, 512),
+    "effect-shockwave": (512, 512),
+    "effect-mushroom-cloud": (512, 512),
+    "creature-giant-zombie": (512, 512),
+    "creature-zombie-tier-1": (512, 512),
+    "creature-zombie-tier-2": (512, 512),
+    "creature-zombie-tier-3": (512, 512),
+    "creature-zombie-tier-4": (512, 512),
+    "creature-zombie-tier-5": (512, 512),
 }
 
 

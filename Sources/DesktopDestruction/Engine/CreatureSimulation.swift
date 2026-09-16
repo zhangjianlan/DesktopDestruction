@@ -645,6 +645,10 @@ final class CreatureActor {
         position
     }
 
+    var healthFraction: CGFloat {
+        maximumHealth > 0 ? currentHealth / maximumHealth : 0
+    }
+
     init(at point: CGPoint, kind: CreatureKind) {
         self.kind = kind
         self.position = point
@@ -697,18 +701,21 @@ final class CreatureActor {
         if kind.isPerson { return 3 }
         if kind.isAnimal { return max(2, traits.bodySize / 34) }
         if kind.isInsect { return 1 }
+        if kind.isVehicle { return max(5, (traits.explosionRadius / 18).rounded()) }
         return 1
     }
 
     @discardableResult
     func applyDamage(_ amount: CGFloat, from attackPoint: CGPoint) -> Bool {
         guard isAlive else { return false }
-        guard zombieTier > 0 || canInfect else { return true }
+        guard zombieTier > 0 || canInfect || kind.isVehicle else { return true }
         currentHealth -= max(0, amount)
         if currentHealth <= 0 {
             return true
         }
-        if !isZombie {
+        if kind.isVehicle {
+            updateVehicleDamageAppearance()
+        } else if !isZombie {
             flee(from: attackPoint)
         }
         return false
@@ -760,10 +767,10 @@ final class CreatureActor {
 
     private func applyZombieTraits() {
         let tier = max(1, zombieTier)
-        let growth = CGFloat(pow(1.34, Double(tier - 1)))
-        let bodySize = min(320, max(58, baseTraits.bodySize * 0.95 * growth))
-        let hitRadius = min(185, bodySize * 0.55)
-        let biteRadius = min(52, max(10, baseTraits.biteRadius * growth * 1.25))
+        let growth = CGFloat(pow(1.42, Double(tier - 1)))
+        let bodySize = min(680, max(64, baseTraits.bodySize * 0.98 * growth))
+        let hitRadius = min(310, bodySize * 0.58)
+        let biteRadius = min(82, max(12, baseTraits.biteRadius * growth * 1.3))
         traits = CreatureTraits(
             speed: max(9, 27 / (1 + CGFloat(tier - 1) * 0.1)),
             turnInterval: 0.85,
@@ -774,12 +781,12 @@ final class CreatureActor {
             hitRadius: hitRadius,
             bodySize: bodySize,
             movement: .chase,
-            deathRadius: min(210, bodySize * 1.1),
+            deathRadius: min(350, bodySize * 1.15),
             leavesTrail: nil,
             explosionRadius: 0,
             deathEffect: .blood
         )
-        maximumHealth = max(8, 8 * CGFloat(pow(1.55, Double(tier - 1))))
+        maximumHealth = max(10, 10 * CGFloat(pow(1.68, Double(tier - 1))))
         currentHealth = maximumHealth
         updateAppearance()
     }
@@ -788,12 +795,21 @@ final class CreatureActor {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         layer.bounds = CGRect(x: 0, y: 0, width: traits.bodySize, height: traits.bodySize)
-        if isZombie, zombieTier >= 3, let image = ArtAssets.image(named: "creature-giant-zombie") {
+        if isZombie,
+           let image = ArtAssets.image(named: "creature-zombie-tier-\(min(zombieTier, 5))") {
             layer.contents = image
         } else {
             layer.contents = IconRenderer.emoji(kindEmoji, size: traits.bodySize * 0.82)
         }
         layer.zPosition = isZombie ? 79 : (kind.isVehicle ? 78 : (kind.isAnimal ? 76 : (kind.isPerson ? 73 : 72)))
+        CATransaction.commit()
+    }
+
+    private func updateVehicleDamageAppearance() {
+        guard kind.isVehicle else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.opacity = Float(0.58 + 0.42 * healthFraction)
         CATransaction.commit()
     }
 

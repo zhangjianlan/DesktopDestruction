@@ -3,20 +3,21 @@ import QuartzCore
 /// Paints persistent damage into a bounded number of bitmap tiles.
 final class DestructionCanvas {
     let root = CALayer()
-    var remainingDamageCount: Int { damageRecords.count }
+    var remainingDamageCount: Int { damageCount }
 
     private let damageLayer = CALayer()
     private let transientLayer = CALayer()
     private var tiles: [TileCoordinate: DamageTile] = [:]
-    private var damageRecords: [DamageRecord] = []
+    private var damageCount = 0
+    private var nextDamageID: UInt64 = 0
     private var dirtyTiles: Set<TileCoordinate> = []
     private var commitIsScheduled = false
     private let tileSize: CGFloat = 512
     private let backingScale: CGFloat = 2
 
     private struct DamageRecord {
+        let id: UInt64
         let frame: CGRect
-        let isPermanent: Bool
     }
 
     private struct TileCoordinate: Hashable {
@@ -28,6 +29,7 @@ final class DestructionCanvas {
         let coordinate: TileCoordinate
         let layer = CALayer()
         let context: CGContext
+        var records: [DamageRecord] = []
 
         init(coordinate: TileCoordinate, tileSize: CGFloat, backingScale: CGFloat) {
             self.coordinate = coordinate
@@ -74,7 +76,8 @@ final class DestructionCanvas {
     }
 
     func addDamage(image: CGImage, frame: CGRect, permanent: Bool = false) {
-        damageRecords.append(DamageRecord(frame: frame, isPermanent: permanent))
+        let record = DamageRecord(id: nextDamageID, frame: frame)
+        var intersectsCanvas = false
         forEachTile(intersecting: frame) { tile in
             tile.context.draw(
                 image,
@@ -85,8 +88,13 @@ final class DestructionCanvas {
                     height: frame.height
                 )
             )
+            tile.records.append(record)
+            intersectsCanvas = true
             dirtyTiles.insert(tile.coordinate)
         }
+        guard intersectsCanvas else { return }
+        nextDamageID += 1
+        damageCount += 1
         scheduleCommit()
     }
 
@@ -119,8 +127,22 @@ final class DestructionCanvas {
             width: radius * 2,
             height: radius * 2
         )
-        let removedCount = damageRecords.filter { $0.frame.intersects(eraseRect) }.count
-        damageRecords.removeAll { $0.frame.intersects(eraseRect) }
+        var removedRecords: [DamageRecord] = []
+        var removedIDs = Set<UInt64>()
+        forEachTile(intersecting: eraseRect) { tile in
+            for record in tile.records where record.frame.intersects(eraseRect) {
+                if removedIDs.insert(record.id).inserted {
+                    removedRecords.append(record)
+                }
+            }
+        }
+
+        let removedCount = removedRecords.count
+        for record in removedRecords {
+            forEachTile(intersecting: record.frame) { tile in
+                tile.records.removeAll { $0.id == record.id }
+            }
+        }
 
         forEachTile(intersecting: eraseRect) { tile in
             tile.context.setBlendMode(.clear)
@@ -139,10 +161,12 @@ final class DestructionCanvas {
 
     @discardableResult
     func clearDamage() -> Int {
-        let removedCount = damageRecords.count
-        damageRecords.removeAll()
+        let removedCount = damageCount
+        damageCount = 0
+        nextDamageID = 0
 
         for tile in tiles.values {
+            tile.records.removeAll()
             tile.context.clear(CGRect(origin: .zero, size: tile.frame.size))
             dirtyTiles.insert(tile.coordinate)
         }

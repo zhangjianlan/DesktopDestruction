@@ -821,7 +821,7 @@ final class DestructionController {
         let hitCreatures = creatures.filter { $0.hitTest(point, radius: radius) }
         for creature in hitCreatures {
             if creature.kind.isVehicle {
-                affected += explodeVehicle(creature)
+                affected += damageVehicle(creature, amount: 0.8, at: point)
             } else {
                 creature.ignite()
                 affected += 1
@@ -857,7 +857,7 @@ final class DestructionController {
         let hitCreatures = creatures.filter { $0.hitTest(point, radius: radius) }
         for creature in hitCreatures {
             if creature.kind.isVehicle {
-                affected += explodeVehicle(creature)
+                affected += damageVehicle(creature, amount: amount, at: point)
             } else {
                 if creature.applyDamage(amount, from: point) {
                     creature.kill(canvas: canvas)
@@ -870,6 +870,27 @@ final class DestructionController {
         }
         creatures.removeAll { !$0.isAlive }
         return affected
+    }
+
+    @discardableResult
+    private func damageVehicle(
+        _ vehicle: CreatureActor,
+        amount: CGFloat,
+        at point: CGPoint
+    ) -> Int {
+        guard vehicle.applyDamage(amount, from: point) else {
+            let position = vehicle.currentPosition
+            ParticleFactory.sparks(at: position, count: 10, in: canvas)
+            ParticleFactory.smoke(at: position, count: 6, in: canvas)
+            AudioManager.shared.play(
+                "hammer_hit",
+                gain: 0.26,
+                rate: 0.72,
+                minimumInterval: 0.06
+            )
+            return 0
+        }
+        return explodeVehicle(vehicle)
     }
 
     @discardableResult
@@ -1140,8 +1161,8 @@ final class DestructionController {
 
         for tier in 1...max(1, maximumTier) {
             var sameTierZombies = creatures.filter { $0.isZombie && $0.zombieTier == tier }
-            while sameTierZombies.count >= 6 {
-                let merging = Array(sameTierZombies.prefix(6))
+            while sameTierZombies.count >= 3 {
+                let merging = Array(sameTierZombies.prefix(3))
                 let survivor = merging[0]
                 for zombie in merging.dropFirst() {
                     zombie.discard()

@@ -38,16 +38,16 @@ final class ToolbarController {
         view.addSubview(stackView)
 
         for tool in Tool.allCases {
-            let button = makeButton(tool.assetName, title: tool.name) { [weak self] in
+            let button = makeEmojiButton(tool.emoji, title: tool.name) { [weak self] in
                 self?.onTool?(tool)
             }
             stackView.addView(button, in: .leading)
         }
 
         stackView.addView(makeSpacer(), in: .leading)
-        stackView.addView(makeButton("ui-restore", title: "恢复") { [weak self] in self?.onRestore?() }, in: .leading)
-        stackView.addView(makeButton("ui-settings", title: "设置") { [weak self] in self?.onSettings?() }, in: .leading)
-        stackView.addView(makeButton("ui-exit", title: "退出") { [weak self] in self?.onExit?() }, in: .leading)
+        stackView.addView(makeEmojiButton("↺", title: "恢复") { [weak self] in self?.onRestore?() }, in: .leading)
+        stackView.addView(makeEmojiButton("⚙️", title: "设置") { [weak self] in self?.onSettings?() }, in: .leading)
+        stackView.addView(makeEmojiButton("✕", title: "退出") { [weak self] in self?.onExit?() }, in: .leading)
         showAndScheduleHide()
     }
 
@@ -66,14 +66,17 @@ final class ToolbarController {
         }
     }
 
-    private func makeButton(_ assetName: String, title label: String, handler: @escaping () -> Void) -> NSButton {
+    private func makeEmojiButton(_ symbol: String, title label: String, handler: @escaping () -> Void) -> NSButton {
         let button = ActionButton(title: "", target: nil, action: nil)
         button.isBordered = false
-        button.font = NSFont.systemFont(ofSize: 20)
+        button.attributedTitle = NSAttributedString(
+            string: symbol,
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 21, weight: .medium),
+                .foregroundColor: NSColor.white
+            ]
+        )
         button.toolTip = label
-        button.image = ArtAssets.nsImage(named: assetName)
-        button.imageScaling = .scaleProportionallyUpOrDown
-        button.imagePosition = .imageOnly
         button.setAccessibilityLabel(label)
         button.translatesAutoresizingMaskIntoConstraints = false
         button.widthAnchor.constraint(equalToConstant: 42).isActive = true
