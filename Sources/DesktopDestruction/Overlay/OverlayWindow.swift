@@ -8,8 +8,8 @@ final class OverlayWindow: NSWindow {
             backing: .buffered,
             defer: false
         )
-        backgroundColor = .clear
-        isOpaque = false
+        backgroundColor = .black
+        isOpaque = true
         hasShadow = false
         ignoresMouseEvents = false
         level = .screenSaver

@@ -6,27 +6,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSLog("[DesktopDestruction] launched")
-        if usesFakeBackground {
-            guard let screen = NSScreen.main else { return }
-            startOverlay(
-                background: DesktopCapture.syntheticBackground(size: screen.frame.size)
-            )
-            return
-        }
+        guard let screen = NSScreen.main else { return }
 
-        PermissionGateController.shared.run(
-            capture: { await DesktopCapture.captureMainDisplay() },
-            onReady: { [weak self] image in
-                self?.startOverlay(background: image)
-            },
-            onUseSyntheticBackground: { [weak self] in
-                guard let screen = NSScreen.main else { return }
-                self?.startOverlay(
-                    background: DesktopCapture.syntheticBackground(size: screen.frame.size)
-                )
-            },
-            onQuit: { AppRuntime.quit() }
-        )
+        // Canvas mode is the default: no screen-recording permission and no
+        // transparent-desktop compositing. Legacy capture remains opt-in.
+        if usesDesktopCapture {
+            PermissionGateController.shared.run(
+                capture: { await DesktopCapture.captureMainDisplay() },
+                onReady: { [weak self] image in
+                    self?.startOverlay(background: image)
+                },
+                onUseSyntheticBackground: { [weak self] in
+                    guard let screen = NSScreen.main else { return }
+                    self?.startOverlay(
+                        background: CanvasBackgroundRenderer.render(size: screen.frame.size)
+                    )
+                },
+                onQuit: { AppRuntime.quit() }
+            )
+        } else {
+            PipelineLog.info("canvas mode enabled")
+            startOverlay(
+                background: CanvasBackgroundRenderer.render(size: screen.frame.size)
+            )
+        }
     }
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
@@ -35,8 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AudioManager.shared.stopAllLoops()
     }
 
-    private var usesFakeBackground: Bool {
-        ProcessInfo.processInfo.environment["DD_FAKE_BACKGROUND"] != nil
+    private var usesDesktopCapture: Bool {
+        ProcessInfo.processInfo.environment["DD_CAPTURE_DESKTOP"] != nil
     }
 
     private func startOverlay(background: CGImage) {

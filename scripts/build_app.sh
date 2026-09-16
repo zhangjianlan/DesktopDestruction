@@ -65,12 +65,12 @@ cat > "$STAGING_APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleIdentifier</key><string>com.codex.desktopdestruction</string>
   <key>CFBundleName</key><string>DesktopDestruction</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.1</string>
-  <key>CFBundleVersion</key><string>2</string>
+  <key>CFBundleShortVersionString</key><string>1.2</string>
+  <key>CFBundleVersion</key><string>3</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
-  <key>NSScreenCaptureUsageDescription</key><string>应用需要一次性截取当前桌面，作为纯视觉破坏效果的背景。</string>
+  <key>NSScreenCaptureUsageDescription</key><string>仅在启用可选桌面截图模式时，用于截取当前桌面作为破坏画板背景。</string>
 </dict>
 </plist>
 PLIST

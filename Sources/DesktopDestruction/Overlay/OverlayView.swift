@@ -27,7 +27,7 @@ final class OverlayView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
-        layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.backgroundColor = NSColor.black.cgColor
     }
 
     required init?(coder: NSCoder) {
