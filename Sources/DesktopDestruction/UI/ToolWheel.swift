@@ -57,7 +57,8 @@ final class ToolWheel {
             item.backgroundColor = CGColor(gray: 0, alpha: 0.72)
             item.borderColor = CGColor(gray: 1, alpha: 0.12)
             item.borderWidth = 1
-            item.contents = IconRenderer.emoji(tool.emoji, size: 34)
+            item.contents = ArtAssets.image(named: tool.assetName)
+                ?? IconRenderer.emoji(tool.emoji, size: 34)
             item.contentsScale = 2
             item.position = CGPoint(
                 x: 180 + cos(angle) * radius,

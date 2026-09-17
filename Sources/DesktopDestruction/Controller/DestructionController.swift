@@ -30,7 +30,13 @@ final class DestructionController {
     private var simulationTimer: Timer?
     private var lastFireIgnition = Date.distantPast
     private var nextCreatureFireCheck = Date.distantPast
+    private var nextEliteZombieSummon = Date.distantPast
+    private var nextZombieVocalization = Date.distantPast
     private var vehicleCollisionTick = 0
+    private var simulationTickCount = 0
+    private var smoothedTickDuration: TimeInterval = 0
+    private var nextFirePerformanceUpdate = Date.distantPast
+    private var currentPerformanceProfile = PerformanceGovernor.current
     private var lastPerformanceLog = Date.distantPast
     private var lastPointerPoint: CGPoint = .zero
     private var emojiOptions: [String] = []
@@ -48,6 +54,7 @@ final class DestructionController {
         cursorLayer.zPosition = 100
 
         cursorReticleLayer.bounds = CGRect(x: 0, y: 0, width: 34, height: 34)
+        cursorReticleLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
         cursorReticleLayer.path = cursorReticlePath()
         cursorReticleLayer.strokeColor = CGColor(red: 1, green: 0.86, blue: 0.28, alpha: 0.98)
         cursorReticleLayer.fillColor = NSColor.clear.cgColor
@@ -241,7 +248,8 @@ final class DestructionController {
     }
 
     private func updateCursor(for tool: Tool) {
-        cursorLayer.contents = IconRenderer.emoji(tool.cursorEmoji, size: 38)
+        cursorLayer.contents = ArtAssets.image(named: tool.cursorAssetName)
+            ?? IconRenderer.emoji(tool.cursorEmoji, size: 38)
     }
 
     private func clampedCursorBadgePoint(for point: CGPoint) -> CGPoint {
@@ -280,7 +288,12 @@ final class DestructionController {
     }
 
     private func hammerSmash(at point: CGPoint) {
-        damageCreatures(at: point, radius: 78, amount: 2)
+        damageCreatures(
+            at: point,
+            radius: 78,
+            amount: toolManager.current.creatureDamage,
+            source: toolManager.current.creatureDamageSource
+        )
         addCrack(at: point, radius: 88, strength: 1.7)
         let secondary = CGPoint(
             x: point.x + CGFloat.random(in: -30...30),
@@ -308,13 +321,18 @@ final class DestructionController {
 
     private func fireGun() {
         let point = CGPoint(
-            x: currentCursorPoint.x + CGFloat.random(in: -18...18),
-            y: currentCursorPoint.y + CGFloat.random(in: -18...18)
+            x: currentCursorPoint.x + CGFloat.random(in: -14...14),
+            y: currentCursorPoint.y + CGFloat.random(in: -14...14)
         )
-        if let damage = DamageRenderer.renderBulletHole(at: point, radius: 25) {
+        if let damage = DamageRenderer.renderBulletHole(at: point, radius: 32) {
             canvas.addDamage(image: damage.0, frame: damage.1)
         }
-        damageCreatures(at: point, radius: 34, amount: 1)
+        damageCreatures(
+            at: point,
+            radius: 42,
+            amount: toolManager.current.creatureDamage,
+            source: toolManager.current.creatureDamageSource
+        )
         addTracer(to: point)
         ParticleFactory.muzzleFlash(at: point, in: canvas)
         AudioManager.shared.play(
@@ -339,7 +357,7 @@ final class DestructionController {
         layer.fillColor = NSColor.clear.cgColor
         layer.lineWidth = 5
         layer.lineCap = .round
-        layer.zPosition = 60
+        layer.zPosition = 95
         canvas.addTransient(layer)
 
         let fade = CABasicAnimation(keyPath: "opacity")
@@ -370,7 +388,12 @@ final class DestructionController {
         let dy = point.y - last.y
         guard sqrt(dx * dx + dy * dy) >= 14 else { return }
 
-        damageCreatures(at: point, radius: 48, amount: 1)
+        damageCreatures(
+            at: point,
+            radius: 48,
+            amount: toolManager.current.creatureDamage,
+            source: toolManager.current.creatureDamageSource
+        )
         if let damage = DamageRenderer.renderCutSegment(from: last, to: point, width: 10) {
             canvas.addDamage(image: damage.0, frame: damage.1)
         }
@@ -405,6 +428,7 @@ final class DestructionController {
     }
 
     private func placeBomb(at point: CGPoint) {
+        let tool = toolManager.current
         let bomb = CALayer()
         bomb.contents = ArtAssets.image(named: "tool-bomb")
         bomb.contentsGravity = .resizeAspect
@@ -435,11 +459,91 @@ final class DestructionController {
             guard let self else { return }
             bomb.removeFromSuperlayer()
             label.removeFromSuperlayer()
-            self.bombBlast(at: point)
+            self.bombBlast(at: point, tool: tool)
         }
     }
 
     private func launchNuke(to target: CGPoint) {
+        let alarmDuration = AudioManager.shared.duration(named: "nuke_alarm") ?? 4.15
+        let alarmPlayed = AudioManager.shared.play("nuke_alarm", gain: 0.92)
+        let launchDelay = alarmPlayed ? alarmDuration + 0.04 : 0.45
+        addNukeAlarmMarker(at: target, duration: launchDelay)
+
+        after(launchDelay) { [weak self] in
+            guard let self else { return }
+            self.launchNukeMissile(to: target)
+        }
+    }
+
+    private func addNukeAlarmMarker(at point: CGPoint, duration: TimeInterval) {
+        let blastRing = CAShapeLayer()
+        let blastRadius: CGFloat = 620
+        let blastPath = CGMutablePath()
+        blastPath.addArc(
+            center: CGPoint(x: blastRadius, y: blastRadius),
+            radius: blastRadius,
+            startAngle: 0,
+            endAngle: 2 * .pi,
+            clockwise: false
+        )
+        blastRing.path = blastPath
+        blastRing.bounds = CGRect(
+            x: 0,
+            y: 0,
+            width: blastRadius * 2,
+            height: blastRadius * 2
+        )
+        blastRing.position = point
+        blastRing.strokeColor = CGColor(red: 1, green: 0.24, blue: 0.2, alpha: 0.3)
+        blastRing.fillColor = CGColor(red: 1, green: 0.18, blue: 0.14, alpha: 0.035)
+        blastRing.lineWidth = 3
+        blastRing.lineDashPattern = [18, 14]
+        blastRing.contentsScale = 2
+        blastRing.zPosition = 88
+        canvas.addTransient(blastRing)
+        canvas.removeAfter(blastRing, delay: duration + 0.12)
+
+        let ring = CAShapeLayer()
+        let radius: CGFloat = 74
+        let path = CGMutablePath()
+        path.addArc(
+            center: CGPoint(x: radius, y: radius),
+            radius: radius,
+            startAngle: 0,
+            endAngle: 2 * .pi,
+            clockwise: false
+        )
+        ring.path = path
+        ring.bounds = CGRect(x: 0, y: 0, width: radius * 2, height: radius * 2)
+        ring.position = point
+        ring.strokeColor = CGColor(red: 1, green: 0.18, blue: 0.16, alpha: 0.95)
+        ring.fillColor = CGColor(red: 1, green: 0.16, blue: 0.14, alpha: 0.14)
+        ring.lineWidth = 6
+        ring.lineCap = .round
+        ring.contentsScale = 2
+        ring.zPosition = 89
+        canvas.addTransient(ring)
+
+        let pulse = CABasicAnimation(keyPath: "transform.scale")
+        pulse.fromValue = 0.68
+        pulse.toValue = 1.12
+        pulse.duration = 0.42
+        pulse.autoreverses = true
+        pulse.repeatCount = Float(max(1, duration / 0.84))
+        pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        ring.add(pulse, forKey: "nukeAlarmPulse")
+
+        let flash = CABasicAnimation(keyPath: "opacity")
+        flash.fromValue = 1
+        flash.toValue = 0.42
+        flash.duration = 0.21
+        flash.autoreverses = true
+        flash.repeatCount = Float(max(1, duration / 0.42))
+        ring.add(flash, forKey: "nukeAlarmFlash")
+        canvas.removeAfter(ring, delay: duration + 0.05)
+    }
+
+    private func launchNukeMissile(to target: CGPoint) {
         let bounds = view.bounds
         let center = CGPoint(x: bounds.midX, y: bounds.midY)
         let dx = target.x - center.x
@@ -479,6 +583,7 @@ final class DestructionController {
     }
 
     private func throwFist(at target: CGPoint) {
+        let tool = toolManager.current
         let fist = CALayer()
         fist.contents = ArtAssets.image(named: "tool-fist")
         fist.contentsGravity = .resizeAspect
@@ -496,7 +601,12 @@ final class DestructionController {
 
         after(0.18) { [weak self] in
             guard let self else { return }
-            self.damageCreatures(at: target, radius: 86, amount: 3)
+            self.damageCreatures(
+                at: target,
+                radius: 86,
+                amount: tool.creatureDamage,
+                source: tool.creatureDamageSource
+            )
             self.addCrack(at: target, radius: 98, strength: 2.1)
             self.addCrack(at: target, radius: 48, strength: 1.2)
             ParticleFactory.sparks(at: target, count: 20, in: self.canvas)
@@ -534,9 +644,14 @@ final class DestructionController {
         creatures.removeAll { !$0.isAlive }
     }
 
-    private func bombBlast(at point: CGPoint) {
+    private func bombBlast(at point: CGPoint, tool: Tool) {
         let radius: CGFloat = 215
-        damageCreatures(at: point, radius: radius + 24, amount: 1000)
+        damageCreatures(
+            at: point,
+            radius: radius + 24,
+            amount: tool.creatureDamage,
+            source: tool.creatureDamageSource
+        )
         damageWalls(at: point, radius: radius, amount: 180)
         addFlash(at: point, radius: radius * 0.9)
         addShockwave(at: point, radius: radius * 0.75)
@@ -561,7 +676,12 @@ final class DestructionController {
         after(0.34) { [weak self] in
             guard let self else { return }
             self.addShockwave(at: point, radius: radius * 1.15)
-            self.damageCreatures(at: point, radius: radius * 1.05, amount: 1000)
+            self.damageCreatures(
+                at: point,
+                radius: radius * 1.05,
+                amount: tool.creatureDamage,
+                source: tool.creatureDamageSource
+            )
             self.damageWalls(at: point, radius: radius * 0.9, amount: 100)
             ParticleFactory.smoke(at: point, count: 24, in: self.canvas)
             ParticleFactory.dust(at: point, count: 30, in: self.canvas)
@@ -572,7 +692,16 @@ final class DestructionController {
 
     private func nukeBlast(at point: CGPoint, angle: CGFloat) {
         let radius: CGFloat = 620
-        damageCreatures(at: point, radius: radius, amount: 5000)
+        var affectedCreatureIDs = Set<UUID>()
+        let (initialResult, updatedCreatureIDs) = resolveNuclearBlast(
+            at: point,
+            radius: radius,
+            affectedCreatureIDs: affectedCreatureIDs
+        )
+        affectedCreatureIDs = updatedCreatureIDs
+        PipelineLog.info(
+            "nuke blast killed=\(initialResult.killedCount) mutated=\(initialResult.mutatedCreatures.count)"
+        )
         damageWalls(at: point, radius: radius, amount: 500)
         addFlash(at: point, radius: radius * 0.82)
         addShockwave(at: point, radius: radius * 0.75)
@@ -614,15 +743,24 @@ final class DestructionController {
             )
         }
 
-        AudioManager.shared.play("explosion", gain: 1, rate: 0.52)
-        AudioManager.shared.play("rocket_launch", gain: 0.7, rate: 0.45)
-        AudioManager.shared.play("glass_shatter", gain: 0.65, rate: 0.78)
+        AudioManager.shared.play("nuke_detonation", gain: 1, minimumInterval: 0.1)
+        AudioManager.shared.play("glass_shatter", gain: 0.3, rate: 0.72)
         ScreenShake.shake(canvas.root, intensity: 46, duration: 1.1)
 
         after(0.38) { [weak self] in
             guard let self else { return }
-            self.addShockwave(at: point, radius: radius * 1.05)
-            self.damageCreatures(at: point, radius: radius * 0.92, amount: 2500)
+            self.addShockwave(at: point, radius: radius * 0.86)
+            let (result, updatedCreatureIDs) = self.resolveNuclearBlast(
+                at: point,
+                radius: radius,
+                affectedCreatureIDs: affectedCreatureIDs
+            )
+            affectedCreatureIDs = updatedCreatureIDs
+            if result.killedCount > 0 || !result.mutatedCreatures.isEmpty {
+                PipelineLog.info(
+                    "nuke aftershock killed=\(result.killedCount) mutated=\(result.mutatedCreatures.count)"
+                )
+            }
             self.damageWalls(at: point, radius: radius * 0.85, amount: 240)
             ParticleFactory.smoke(at: point, count: 54, in: self.canvas)
             ParticleFactory.dust(at: point, count: 70, in: self.canvas)
@@ -631,8 +769,18 @@ final class DestructionController {
 
         after(0.82) { [weak self] in
             guard let self else { return }
-            self.addShockwave(at: point, radius: radius * 1.24)
-            self.damageCreatures(at: point, radius: radius * 1.08, amount: 1800)
+            self.addShockwave(at: point, radius: radius)
+            let (result, updatedCreatureIDs) = self.resolveNuclearBlast(
+                at: point,
+                radius: radius,
+                affectedCreatureIDs: affectedCreatureIDs
+            )
+            affectedCreatureIDs = updatedCreatureIDs
+            if result.killedCount > 0 || !result.mutatedCreatures.isEmpty {
+                PipelineLog.info(
+                    "nuke final aftershock killed=\(result.killedCount) mutated=\(result.mutatedCreatures.count)"
+                )
+            }
             self.damageWalls(at: point, radius: radius, amount: 180)
             ParticleFactory.smoke(at: point, count: 38, in: self.canvas)
             AudioManager.shared.play("explosion", gain: 0.48, rate: 0.38)
@@ -793,7 +941,7 @@ final class DestructionController {
     private func igniteFire(at point: CGPoint, intensity: CGFloat = 1.25, force: Bool = false) {
         let now = Date()
         guard force || now.timeIntervalSince(lastFireIgnition) >= 0.48 else { return }
-        guard burningSpots.count < 80 else { return }
+        guard burningSpots.count < currentPerformanceProfile.maximumBurningSpots else { return }
         lastFireIgnition = now
         burningSpots.append(BurningSpot(at: point, canvas: canvas, intensity: intensity))
         ensureSimulation()
@@ -837,9 +985,11 @@ final class DestructionController {
         }
     }
 
-    private func igniteCreaturesFromBurningSpots() {
+    private func igniteCreaturesFromBurningSpots(spatialGrid: CreatureSpatialGrid) {
         for spot in burningSpots {
-            for creature in creatures where creature.isAlive && !creature.kind.isVehicle {
+            let nearbyCreatures = spatialGrid
+                .nearbyActors(point: spot.position, radius: spot.radius * 0.7)
+            for creature in nearbyCreatures where creature.isAlive && !creature.kind.isVehicle {
                 if creature.hitTest(spot.position, radius: spot.radius * 0.7) {
                     creature.ignite()
                 }
@@ -848,19 +998,25 @@ final class DestructionController {
     }
 
     @discardableResult
-    private func damageCreatures(at point: CGPoint, radius: CGFloat, amount: CGFloat = 1000) -> Int {
+    private func damageCreatures(
+        at point: CGPoint,
+        radius: CGFloat,
+        amount: CGFloat = 1000,
+        source: CreatureDamageSource = .weapon
+    ) -> Int {
         var affected = 0
         let hitCreatures = creatures.filter { $0.hitTest(point, radius: radius) }
         for creature in hitCreatures {
             if creature.kind.isVehicle {
-                affected += damageVehicle(creature, amount: amount, at: point)
+                affected += damageVehicle(creature, amount: amount, at: point, source: source)
             } else {
-                if creature.applyDamage(amount, from: point) {
+                guard !creature.isImmune(to: source) else { continue }
+                if creature.applyDamage(amount, from: point, source: source) {
                     creature.kill(canvas: canvas)
                     affected += 1
                 } else {
                     affected += 1
-                    ParticleFactory.dust(at: creature.currentPosition, count: 4, in: canvas)
+                    showCreatureHitFeedback(for: creature, at: point)
                 }
             }
         }
@@ -868,15 +1024,91 @@ final class DestructionController {
         return affected
     }
 
+    private func showCreatureHitFeedback(for creature: CreatureActor, at point: CGPoint) {
+        let isVehicle = creature.kind.isVehicle
+        let impactPoint = clampPointToCreature(point, creature: creature)
+        let ringRadius = min(
+            104,
+            max(20, creature.traits.bodySize * (isVehicle ? 0.42 : 0.34))
+        )
+        addCreatureHitRing(
+            at: impactPoint,
+            radius: ringRadius,
+            color: isVehicle
+                ? CGColor(red: 1, green: 0.74, blue: 0.28, alpha: 0.95)
+                : CGColor(red: 1, green: 0.16, blue: 0.12, alpha: 0.95)
+        )
+        ParticleFactory.creatureHit(at: impactPoint, isVehicle: isVehicle, in: canvas)
+        AudioManager.shared.play(
+            "punch_hit",
+            gain: isVehicle ? 0.18 : 0.14,
+            rate: isVehicle ? 1.48 : 1.72,
+            minimumInterval: 0.09
+        )
+    }
+
+    private func clampPointToCreature(_ point: CGPoint, creature: CreatureActor) -> CGPoint {
+        let center = creature.currentPosition
+        let dx = point.x - center.x
+        let dy = point.y - center.y
+        let distance = hypot(dx, dy)
+        let maximumDistance = max(1, creature.traits.hitRadius)
+        guard distance > maximumDistance else { return point }
+        return CGPoint(
+            x: center.x + dx / distance * maximumDistance,
+            y: center.y + dy / distance * maximumDistance
+        )
+    }
+
+    private func addCreatureHitRing(
+        at point: CGPoint,
+        radius: CGFloat,
+        color: CGColor
+    ) {
+        let ring = CAShapeLayer()
+        let path = CGMutablePath()
+        path.addEllipse(in: CGRect(x: 0, y: 0, width: radius * 2, height: radius * 2))
+        ring.path = path
+        ring.frame = CGRect(
+            x: point.x - radius,
+            y: point.y - radius,
+            width: radius * 2,
+            height: radius * 2
+        )
+        ring.strokeColor = color
+        ring.fillColor = CGColor(red: 1, green: 1, blue: 1, alpha: 0.08)
+        ring.lineWidth = 3.5
+        ring.lineCap = .round
+        ring.contentsScale = 2
+        ring.zPosition = 97
+        canvas.addTransient(ring)
+
+        let scale = CABasicAnimation(keyPath: "transform.scale")
+        scale.fromValue = 0.35
+        scale.toValue = 1.22
+        scale.duration = 0.17
+        scale.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 1
+        fade.toValue = 0
+        fade.duration = 0.2
+        fade.fillMode = .forwards
+        fade.isRemovedOnCompletion = false
+        ring.add(scale, forKey: "creatureHitScale")
+        ring.add(fade, forKey: "creatureHitFade")
+        canvas.removeAfter(ring, delay: 0.22)
+    }
+
     @discardableResult
     private func damageVehicle(
         _ vehicle: CreatureActor,
         amount: CGFloat,
-        at point: CGPoint
+        at point: CGPoint,
+        source: CreatureDamageSource = .weapon
     ) -> Int {
-        guard vehicle.applyDamage(amount, from: point) else {
+        guard vehicle.applyDamage(amount, from: point, source: source) else {
             let position = vehicle.currentPosition
-            ParticleFactory.sparks(at: position, count: 10, in: canvas)
+            showCreatureHitFeedback(for: vehicle, at: point)
             ParticleFactory.smoke(at: position, count: 6, in: canvas)
             AudioManager.shared.play(
                 "hammer_hit",
@@ -887,6 +1119,35 @@ final class DestructionController {
             return 0
         }
         return explodeVehicle(vehicle)
+    }
+
+    private func resolveNuclearBlast(
+        at point: CGPoint,
+        radius: CGFloat,
+        affectedCreatureIDs: Set<UUID>
+    ) -> (result: NuclearBlastResult, affectedCreatureIDs: Set<UUID>) {
+        var affectedCreatureIDs = affectedCreatureIDs
+        let result = NuclearBlastRules.resolve(
+            creatures: creatures,
+            at: point,
+            radius: radius,
+            canvas: canvas,
+            affectedCreatureIDs: &affectedCreatureIDs
+        )
+
+        for creature in result.mutatedCreatures {
+            addCreatureEffect(
+                named: "effect-evolution",
+                at: creature.currentPosition,
+                size: max(180, creature.traits.bodySize * 1.2)
+            )
+            ParticleFactory.sparks(at: creature.currentPosition, count: 48, in: canvas)
+            ParticleFactory.smoke(at: creature.currentPosition, count: 26, in: canvas)
+            AudioManager.shared.play("punch_hit", gain: 0.78, rate: 0.34)
+        }
+
+        creatures.removeAll { !$0.isAlive }
+        return (result, affectedCreatureIDs)
     }
 
     @discardableResult
@@ -902,7 +1163,8 @@ final class DestructionController {
             if creature.kind.isVehicle {
                 affected += explodeVehicle(creature)
             } else {
-                if creature.applyDamage(1000, from: point) {
+                guard !creature.isImmune(to: .explosion) else { continue }
+                if creature.applyDamage(1000, from: point, source: .explosion) {
                     creature.kill(canvas: canvas)
                 }
                 affected += 1
@@ -972,25 +1234,31 @@ final class DestructionController {
         ScreenShake.shake(canvas.root, intensity: 21, duration: 0.35)
     }
 
-    private func resolveVehicleCollisions() {
+    private func resolveVehicleCollisions(spatialGrid: CreatureSpatialGrid) {
         var hadCollision = false
         var vehicleCollisionPairs: [(vehicle: CreatureActor, other: CreatureActor)] = []
-        var fusionMonsterCollisions: [CreatureActor] = []
+        var eliteZombieCollisions: [CreatureActor] = []
+        var seenVehiclePairs = Set<Set<UUID>>()
 
-        for (index, vehicle) in creatures.enumerated() {
+        for vehicle in creatures {
             guard vehicle.isAlive && vehicle.kind.isVehicle else { continue }
-            for otherIndex in creatures.indices where otherIndex > index {
-                let other = creatures[otherIndex]
+            for entry in spatialGrid.nearbyEntries(
+                point: vehicle.currentPosition,
+                radius: vehicle.traits.hitRadius
+            ) {
+                let other = entry.creature
                 guard other.isAlive else { continue }
                 guard vehicle.hitTest(other.currentPosition, radius: vehicle.traits.hitRadius) else {
                     continue
                 }
 
                 if other.kind.isVehicle {
+                    let pair = Set([vehicle.id, other.id])
+                    guard seenVehiclePairs.insert(pair).inserted else { continue }
                     vehicleCollisionPairs.append((vehicle, other))
                     hadCollision = true
-                } else if other.isFusionMonster {
-                    fusionMonsterCollisions.append(vehicle)
+                } else if other.isEliteZombie {
+                    eliteZombieCollisions.append(vehicle)
                     hadCollision = true
                 } else {
                     let died = other.kill(canvas: canvas)
@@ -1018,7 +1286,7 @@ final class DestructionController {
             explodeVehicle(collision.vehicle)
         }
 
-        for vehicle in fusionMonsterCollisions where vehicle.isAlive {
+        for vehicle in eliteZombieCollisions where vehicle.isAlive {
             explodeVehicle(vehicle)
         }
 
@@ -1033,10 +1301,14 @@ final class DestructionController {
 
     private func ensureSimulation() {
         guard simulationTimer == nil else { return }
-        simulationTimer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+        simulationTimer = Timer(
+            timeInterval: currentPerformanceProfile.simulationInterval,
+            repeats: true
+        ) { [weak self] _ in
             self?.simulationTick()
         }
         if let simulationTimer {
+            simulationTimer.tolerance = 0.004
             RunLoop.main.add(simulationTimer, forMode: .common)
         }
     }
@@ -1045,8 +1317,14 @@ final class DestructionController {
         let tickStartedAt = CFAbsoluteTimeGetCurrent()
         let now = Date()
         let bounds = view.bounds
-        let lowDetail = burningSpots.count > 24 || creatures.count > 120
-        let maxBurningSpots = lowDetail ? 40 : 72
+        currentPerformanceProfile = PerformanceGovernor.update(
+            creatureCount: creatures.count,
+            burningFireCount: burningSpots.count,
+            recentTickDuration: smoothedTickDuration
+        )
+        let profile = currentPerformanceProfile
+        let lowDetail = profile.lowDetail
+        let maxBurningSpots = profile.maximumBurningSpots
         var survivingSpots: [BurningSpot] = []
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -1073,24 +1351,55 @@ final class DestructionController {
         CATransaction.commit()
         burningSpots = survivingSpots
 
+        if now >= nextFirePerformanceUpdate {
+            nextFirePerformanceUpdate = now.addingTimeInterval(0.2)
+            for creature in creatures where creature.isBurning {
+                creature.updateFirePerformance()
+            }
+        }
+
+        let spatialGrid = CreatureSpatialGrid(creatures: creatures)
+        let populationCount = creatures.count
+
         CATransaction.begin()
-        CATransaction.setDisableActions(true)
+        CATransaction.setDisableActions(false)
+        CATransaction.setAnimationDuration(
+            min(0.085, max(0.035, profile.simulationInterval * 1.2))
+        )
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
         creatures = creatures.filter {
-            $0.update(
+            let nearbyOthers = spatialGrid.nearbyActors(
+                point: $0.currentPosition,
+                radius: 320
+            )
+            return $0.update(
                 now: now,
                 canvas: canvas,
                 bounds: bounds,
                 threat: currentCursorPoint,
-                others: creatures,
-                walls: walls
+                others: nearbyOthers,
+                walls: walls,
+                populationCount: populationCount,
+                damageChanceScale: profile.desktopDamageChanceScale
             )
         }
         CATransaction.commit()
 
-        let persistentDamageChance: CGFloat = creatures.count < 90 ? 1 : (creatures.count < 150 ? 0.55 : 0.28)
-        resolveCreatureInteractions(now: now)
-        resolveGiantZombieDestruction()
-        mergeZombies()
+        let basePersistentDamageChance: CGFloat = creatures.count < 90
+            ? 1
+            : (creatures.count < 150 ? 0.55 : 0.28)
+        let persistentDamageChance = basePersistentDamageChance * profile.desktopDamageChanceScale
+        playZombieAmbience(now: now)
+        simulationTickCount += 1
+        if simulationTickCount % profile.interactionStride == 0 {
+            resolveCreatureInteractions(now: now, spatialGrid: spatialGrid)
+        }
+        if simulationTickCount % profile.giantZombieStride == 0 {
+            resolveGiantZombieDestruction(spatialGrid: spatialGrid)
+        }
+        if simulationTickCount % profile.eliteZombieStride == 0 {
+            summonEliteZombies(now: now)
+        }
 
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -1105,17 +1414,23 @@ final class DestructionController {
 
         if now >= nextCreatureFireCheck {
             nextCreatureFireCheck = now.addingTimeInterval(0.1)
-            igniteCreaturesFromBurningSpots()
+            igniteCreaturesFromBurningSpots(spatialGrid: spatialGrid)
         }
         vehicleCollisionTick += 1
-        if vehicleCollisionTick % 2 == 0 {
-            resolveVehicleCollisions()
+        if vehicleCollisionTick % profile.vehicleCollisionStride == 0 {
+            resolveVehicleCollisions(spatialGrid: spatialGrid)
         }
+
+        let tickDuration = CFAbsoluteTimeGetCurrent() - tickStartedAt
+        smoothedTickDuration = smoothedTickDuration == 0
+            ? tickDuration
+            : smoothedTickDuration * 0.8 + tickDuration * 0.2
+        simulationTimer?.fireDate = Date().addingTimeInterval(profile.simulationInterval)
 
         if now.timeIntervalSince(lastPerformanceLog) >= 1 {
             lastPerformanceLog = now
             PipelineLog.info(
-                "perf creatures=\(creatures.count) damage=\(canvas.remainingDamageCount) fire=\(burningSpots.count) tick_ms=\((CFAbsoluteTimeGetCurrent() - tickStartedAt) * 1000)"
+                "perf creatures=\(creatures.count) damage=\(canvas.remainingDamageCount) fire=\(burningSpots.count) tick_ms=\(tickDuration * 1000) rate=\(Int((1 / profile.simulationInterval).rounded()))"
             )
         }
 
@@ -1125,21 +1440,33 @@ final class DestructionController {
         }
     }
 
-    private func resolveCreatureInteractions(now: Date) {
+    private func resolveCreatureInteractions(
+        now: Date,
+        spatialGrid: CreatureSpatialGrid
+    ) {
         for creature in creatures where creature.isAlive {
-            guard let target = creature.creatureBiteTargetIfReady(now: now, others: creatures) else {
+            let nearbyOthers = spatialGrid.nearbyActors(
+                point: creature.currentPosition,
+                radius: creature.traits.biteRadius + creature.traits.hitRadius
+            )
+            guard let target = creature.creatureBiteTargetIfReady(now: now, others: nearbyOthers) else {
                 continue
             }
 
             if creature.isZombie {
-                target.infect()
+                target.infect(fromZombieTier: creature.zombieTier)
                 addCreatureEffect(
                     named: "effect-zombie-bite",
                     at: target.currentPosition,
                     size: max(48, creature.traits.biteRadius * 4)
                 )
                 ParticleFactory.dust(at: target.currentPosition, count: 5, in: canvas)
-                AudioManager.shared.play("switch_click", gain: 0.22, rate: 0.55)
+                AudioManager.shared.play(
+                    "zombie_bite",
+                    gain: 0.52,
+                    rate: Float.random(in: 0.94...1.12),
+                    minimumInterval: 0.14
+                )
             } else if creature.kind.isAnimal {
                 if target.kill(canvas: canvas) {
                     creature.evolve()
@@ -1162,54 +1489,176 @@ final class DestructionController {
         creatures.removeAll { !$0.isAlive }
     }
 
-    private func mergeZombies() {
-        guard creatures.contains(where: \.isZombie) else { return }
-        let maximumTier = creatures.compactMap { $0.isZombie ? $0.zombieTier : nil }.max() ?? 0
+    private func summonEliteZombies(now: Date) {
+        guard now >= nextEliteZombieSummon else { return }
+        let zombies = creatures.filter { $0.isZombie && $0.isAlive }
+        guard !zombies.isEmpty else { return }
 
-        for tier in 1...max(1, maximumTier) {
-            var sameTierZombies = creatures.filter { $0.isZombie && $0.zombieTier == tier }
-            while sameTierZombies.count >= 2 {
-                let merging = Array(sameTierZombies.prefix(2))
-                let survivor = merging[0]
-                for zombie in merging.dropFirst() {
-                    zombie.discard()
-                }
-                survivor.promoteZombieTier()
+        for group in zombieGroups(in: zombies) {
+            let normalZombies = group.filter { $0.zombieTier == 1 }
+            let eliteTier = ZombieSwarmRules.eliteTier(for: normalZombies.count)
+            let strongestExistingTier = group.map(\.zombieTier).max() ?? 0
+            guard eliteTier > strongestExistingTier,
+                  let chosenZombie = normalZombies.randomElement() else {
+                continue
+            }
 
-                if let damage = DamageRenderer.renderScorch(
-                    at: survivor.currentPosition,
-                    radius: survivor.traits.bodySize * 0.7
-                ) {
-                    canvas.addDamage(image: damage.0, frame: damage.1)
+            chosenZombie.promoteZombieTier(to: eliteTier)
+            addCreatureEffect(
+                named: "effect-evolution",
+                at: chosenZombie.currentPosition,
+                size: max(88, chosenZombie.traits.bodySize * 1.35)
+            )
+            ParticleFactory.sparks(at: chosenZombie.currentPosition, count: 32, in: canvas)
+            ParticleFactory.dust(at: chosenZombie.currentPosition, count: 18, in: canvas)
+            AudioManager.shared.play("punch_hit", gain: 0.62, rate: 0.44)
+            nextEliteZombieSummon = now.addingTimeInterval(ZombieSwarmRules.summonCooldown)
+            PipelineLog.info(
+                "elite zombie summoned tier=\(eliteTier) group_normal_count=\(normalZombies.count)"
+            )
+            return
+        }
+    }
+
+    private func playZombieAmbience(now: Date) {
+        guard now >= nextZombieVocalization else { return }
+        let zombies = creatures.filter { $0.isAlive && $0.isZombie }
+        guard let strongestZombie = zombies.max(by: {
+            ($0.isRadiationMonster ? 1000 + $0.radiationPower : $0.zombieTier)
+                < ($1.isRadiationMonster ? 1000 + $1.radiationPower : $1.zombieTier)
+        }) else {
+            return
+        }
+
+        if strongestZombie.isRadiationMonster {
+            AudioManager.shared.play(
+                "zombie_elite_roar",
+                gain: 0.68,
+                rate: Float(max(0.62, 0.88 - Double(strongestZombie.radiationPower) * 0.015)),
+                minimumInterval: 0.25
+            )
+        } else if strongestZombie.isEliteZombie {
+            AudioManager.shared.play(
+                "zombie_elite_roar",
+                gain: 0.62,
+                rate: Float(max(0.7, 1.04 - Double(strongestZombie.zombieTier) * 0.035)),
+                minimumInterval: 0.25
+            )
+        } else {
+            let growls = ["zombie_growl_01", "zombie_growl_02", "zombie_growl_03"]
+            AudioManager.shared.play(
+                growls.randomElement() ?? "zombie_growl_01",
+                gain: 0.36,
+                rate: Float.random(in: 0.95...1.12),
+                minimumInterval: 0.25
+            )
+        }
+
+        let crowding = min(1.0, Double(zombies.count) / 30.0)
+        nextZombieVocalization = now.addingTimeInterval(2.25 - crowding * 0.95)
+    }
+
+    private func zombieGroups(in zombies: [CreatureActor]) -> [[CreatureActor]] {
+        struct Cell: Hashable {
+            let x: Int
+            let y: Int
+        }
+
+        let cellSize = ZombieSwarmRules.linkDistance
+        var cells: [Cell: [Int]] = [:]
+        for (index, zombie) in zombies.enumerated() {
+            let cell = Cell(
+                x: Int(floor(zombie.currentPosition.x / cellSize)),
+                y: Int(floor(zombie.currentPosition.y / cellSize))
+            )
+            cells[cell, default: []].append(index)
+        }
+
+        var parents = Array(zombies.indices)
+        func parent(of index: Int) -> Int {
+            var root = index
+            while parents[root] != root {
+                root = parents[root]
+            }
+            var current = index
+            while parents[current] != root {
+                let next = parents[current]
+                parents[current] = root
+                current = next
+            }
+            return root
+        }
+        func union(_ first: Int, _ second: Int) {
+            let firstRoot = parent(of: first)
+            let secondRoot = parent(of: second)
+            guard firstRoot != secondRoot else { return }
+            parents[secondRoot] = firstRoot
+        }
+
+        let maximumDistanceSquared = cellSize * cellSize
+        for (index, zombie) in zombies.enumerated() {
+            let cellX = Int(floor(zombie.currentPosition.x / cellSize))
+            let cellY = Int(floor(zombie.currentPosition.y / cellSize))
+            for neighborX in (cellX - 1)...(cellX + 1) {
+                for neighborY in (cellY - 1)...(cellY + 1) {
+                    for otherIndex in cells[Cell(x: neighborX, y: neighborY), default: []] {
+                        guard otherIndex > index else { continue }
+                        let dx = zombie.currentPosition.x - zombies[otherIndex].currentPosition.x
+                        let dy = zombie.currentPosition.y - zombies[otherIndex].currentPosition.y
+                        if dx * dx + dy * dy <= maximumDistanceSquared {
+                            union(index, otherIndex)
+                        }
+                    }
                 }
-                ParticleFactory.dust(at: survivor.currentPosition, count: 22, in: canvas)
-                ParticleFactory.sparks(at: survivor.currentPosition, count: 14, in: canvas)
-                AudioManager.shared.play("punch_hit", gain: 0.45, rate: 0.55)
-                sameTierZombies.removeAll { !($0.isAlive) }
             }
         }
 
-        creatures.removeAll { !$0.isAlive }
+        var groupedIndexes: [Int: [Int]] = [:]
+        for index in zombies.indices {
+            groupedIndexes[parent(of: index), default: []].append(index)
+        }
+        return groupedIndexes.values.map { indexes in indexes.map { zombies[$0] } }
     }
 
-    private func resolveGiantZombieDestruction() {
-        let giants = creatures.filter(\.isFusionMonster)
+    private func resolveGiantZombieDestruction(spatialGrid: CreatureSpatialGrid) {
+        let giants = creatures.filter(\.isEliteZombie)
         guard !giants.isEmpty else { return }
 
         for giant in giants where giant.isAlive {
-            for vehicle in creatures
+            let nearbyCreatures = spatialGrid.nearbyActors(
+                point: giant.currentPosition,
+                radius: giant.traits.hitRadius
+            )
+            for vehicle in nearbyCreatures
             where vehicle.isAlive && vehicle.kind.isVehicle && vehicle.id != giant.id {
                 if vehicle.hitTest(giant.currentPosition, radius: giant.traits.hitRadius) {
                     explodeVehicle(vehicle)
                 }
             }
 
-            for victim in creatures
+            for victim in nearbyCreatures
             where victim.isAlive
                 && !victim.kind.isVehicle
                 && !victim.isZombie
                 && victim.id != giant.id
                 && victim.hitTest(giant.currentPosition, radius: giant.traits.hitRadius) {
+                if victim.isHighTierAnimal && giant.zombieTier < victim.zombieInfectionTier {
+                    victim.infect(fromZombieTier: giant.zombieTier)
+                    addCreatureEffect(
+                        named: "effect-zombie-bite",
+                        at: victim.currentPosition,
+                        size: max(64, giant.traits.biteRadius * 3)
+                    )
+                    ParticleFactory.dust(at: victim.currentPosition, count: 10, in: canvas)
+                    AudioManager.shared.play(
+                        "zombie_bite",
+                        gain: 0.62,
+                        rate: 0.82,
+                        minimumInterval: 0.16
+                    )
+                    continue
+                }
+
                 if victim.applyDamage(giant.destructionPower, from: giant.currentPosition) {
                     victim.kill(canvas: canvas)
                 }

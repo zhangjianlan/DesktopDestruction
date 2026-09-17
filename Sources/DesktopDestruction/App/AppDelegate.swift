@@ -8,9 +8,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSLog("[DesktopDestruction] launched")
         guard let screen = NSScreen.main else { return }
 
-        // Canvas mode is the default: no screen-recording permission and no
-        // transparent-desktop compositing. Legacy capture remains opt-in.
-        if usesDesktopCapture {
+        // Capture the real desktop by default. The comic canvas remains useful
+        // for demos and permission troubleshooting, but is opt-in only.
+        if usesSyntheticCanvas {
+            PipelineLog.info("synthetic canvas mode enabled")
+            startOverlay(
+                background: CanvasBackgroundRenderer.render(size: screen.frame.size)
+            )
+        } else {
             PermissionGateController.shared.run(
                 capture: { await DesktopCapture.captureMainDisplay() },
                 onReady: { [weak self] image in
@@ -24,11 +29,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 },
                 onQuit: { AppRuntime.quit() }
             )
-        } else {
-            PipelineLog.info("canvas mode enabled")
-            startOverlay(
-                background: CanvasBackgroundRenderer.render(size: screen.frame.size)
-            )
         }
     }
 
@@ -38,8 +38,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AudioManager.shared.stopAllLoops()
     }
 
-    private var usesDesktopCapture: Bool {
-        ProcessInfo.processInfo.environment["DD_CAPTURE_DESKTOP"] != nil
+    private var usesSyntheticCanvas: Bool {
+        guard let value = ProcessInfo.processInfo.environment["DD_CANVAS_MODE"] else {
+            return false
+        }
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized.isEmpty || normalized == "1" || normalized == "true" || normalized == "yes"
     }
 
     private func startOverlay(background: CGImage) {

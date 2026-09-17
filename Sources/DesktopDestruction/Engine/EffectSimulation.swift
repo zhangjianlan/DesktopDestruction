@@ -54,26 +54,9 @@ final class BurningSpot {
 
         let intensity = currentIntensity(age: age)
         let emitterUpdateInterval: TimeInterval = lowDetail ? 0.07 : 0.02
-        if now.timeIntervalSince(lastEmitterUpdate) >= emitterUpdateInterval,
-           let cells = emitter.emitterCells,
-           cells.count >= 2 {
+        if now.timeIntervalSince(lastEmitterUpdate) >= emitterUpdateInterval {
             lastEmitterUpdate = now
-            if cells.count > 0 {
-                cells[0].scale = 0.38 * intensity
-                cells[0].birthRate = 48 * Float(intensity)
-            }
-            if cells.count > 1 {
-                cells[1].scale = 0.5 * min(1.25, intensity)
-                cells[1].birthRate = 12 * Float(max(0.45, intensity * 0.8))
-            }
-            if cells.count > 2 {
-                cells[2].scale = 0.28 * intensity
-                cells[2].birthRate = 22 * Float(intensity)
-            }
-            if cells.count > 3 {
-                cells[3].birthRate = 8 * Float(intensity)
-            }
-            emitter.emitterCells = cells
+            ParticleFactory.updateLingeringFire(emitter, intensity: intensity)
         }
         emitter.opacity = age > burnDuration - 0.8
             ? Float(max(0, (burnDuration - age) / 0.8))

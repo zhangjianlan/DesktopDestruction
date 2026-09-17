@@ -8,9 +8,25 @@ final class AudioManager {
     private var loops: [String: AVAudioPlayer] = [:]
     private var cursors: [String: Int] = [:]
     private var lastPlayTimes: [String: CFTimeInterval] = [:]
+    private var durations: [String: TimeInterval] = [:]
     private let poolSize = 6
 
     private init() {}
+
+    func duration(named name: String) -> TimeInterval? {
+        if let cached = durations[name] {
+            return cached
+        }
+        guard let url = Bundle.module.url(
+            forResource: name,
+            withExtension: "wav",
+            subdirectory: "Resources/Sounds"
+        ), let player = try? AVAudioPlayer(contentsOf: url) else {
+            return nil
+        }
+        durations[name] = player.duration
+        return player.duration
+    }
 
     @discardableResult
     func play(

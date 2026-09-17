@@ -12,6 +12,9 @@ final class DestructionCanvas {
     private var nextDamageID: UInt64 = 0
     private var dirtyTiles: Set<TileCoordinate> = []
     private var commitIsScheduled = false
+    private var pendingCommitWorkItem: DispatchWorkItem?
+    private var lastCommitAt: CFAbsoluteTime = 0
+    private let commitInterval: CFTimeInterval = 1.0 / 15.0
     private let tileSize: CGFloat = 512
     private let backingScale: CGFloat = 2
 
@@ -170,7 +173,7 @@ final class DestructionCanvas {
             tile.context.clear(CGRect(origin: .zero, size: tile.frame.size))
             dirtyTiles.insert(tile.coordinate)
         }
-        scheduleCommit()
+        scheduleCommit(force: true)
         return removedCount
     }
 
@@ -230,7 +233,26 @@ final class DestructionCanvas {
     }
 
     private func scheduleCommit() {
-        guard !commitIsScheduled, !dirtyTiles.isEmpty else { return }
+        scheduleCommit(force: false)
+    }
+
+    private func scheduleCommit(force: Bool) {
+        guard !dirtyTiles.isEmpty else { return }
+
+        if force {
+            pendingCommitWorkItem?.cancel()
+        } else {
+            guard !commitIsScheduled else { return }
+        }
+
+        let elapsed = CFAbsoluteTimeGetCurrent() - lastCommitAt
+        let delay = force ? 0 : max(0, commitInterval - elapsed)
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.commitDirtyTiles()
+        }
+        pendingCommitWorkItem = workItem
+        commitIsScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
         commitIsScheduled = true
         DispatchQueue.main.async { [weak self] in
             self?.commitDirtyTiles()
@@ -238,7 +260,9 @@ final class DestructionCanvas {
     }
 
     private func commitDirtyTiles() {
+        pendingCommitWorkItem = nil
         commitIsScheduled = false
+        lastCommitAt = CFAbsoluteTimeGetCurrent()
         guard !dirtyTiles.isEmpty else { return }
 
         CATransaction.begin()

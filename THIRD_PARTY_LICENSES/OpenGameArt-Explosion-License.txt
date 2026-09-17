@@ -1,6 +1,6 @@
 Explosion sprites
-Author: Cuzco
-Source: https://opengameart.org/content/explosion
+Author: Rebekka Helzle / TinyWorlds
+Source: https://opengameart.org/content/explosion-animation
 License: CC0 1.0 Universal
 
 Creative Commons Legal Code

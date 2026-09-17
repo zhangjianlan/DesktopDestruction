@@ -17,10 +17,18 @@
 ## OpenGameArt Explosion
 
 - Project: https://opengameart.org/content/explosion
-- Author: Cuzco
+- Author: Rebekka Helzle / TinyWorlds
 - License: Creative Commons Zero (CC0)
 - Local license: `THIRD_PARTY_LICENSES/OpenGameArt-Explosion-License.txt`
 - Use: cartoon explosion sprite for bombs, rockets, and vehicle blasts.
+
+## Game-icons.net
+
+- Project: https://game-icons.net/
+- Authors: Lorc, Delapouite, Skoll, Sbed, and other Game-icons contributors
+- License: CC BY 3.0
+- Local license: `THIRD_PARTY_LICENSES/Game-Icons-License.txt`
+- Use: high-contrast weapon and interface glyph sources, recolored and outlined for the comic-style toolbar, tool wheel, and cursor.
 
 ## Kenney Animal Pack Remastered
 
@@ -42,3 +50,10 @@
 - License: Creative Commons Zero (CC0)
 - Local license: `THIRD_PARTY_LICENSES/Kenney-Platformer-Characters-License.txt`
 - Use: additional cartoon human and zombie actor sprites.
+
+## Kenney Monster Builder Pack
+
+- Project: https://kenney.nl/assets/monster-builder-pack
+- License: Creative Commons Zero (CC0)
+- Local license: `THIRD_PARTY_LICENSES/Kenney-Monster-Builder-Pack-License.txt`
+- Use: modular cartoon monster parts composed into the radiation monster sprite.

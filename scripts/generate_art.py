@@ -220,20 +220,59 @@ def draw_flame(art: Art) -> None:
 
 
 def draw_explosion(art: Art) -> None:
-    art.star((256, 256), 238, 88, 18, fill=(127, 29, 29, 255))
-    art.star((256, 256), 200, 76, 16, fill=ORANGE)
-    art.star((256, 256), 146, 58, 14, fill=YELLOW)
-    art.ellipse((212, 212, 88, 88), WHITE, width=8)
-
-    for center, radius in [((64, 108), 28), ((434, 128), 33), ((92, 392), 31), ((410, 390), 26)]:
-        art.star(center, radius, radius * 0.38, 9, fill=YELLOW, width=7)
+    center = (256, 256)
+    outer = (239, 68, 22, 255)
+    mid = (250, 204, 21, 255)
 
     art.ellipse(
-        (32, 32, 448, 448),
-        (255, 255, 255, 0),
-        outline=(255, 255, 255, 105),
-        width=15,
+        (54, 54, 404, 404),
+        (255, 196, 84, 52),
+        outline=(255, 236, 178, 96),
+        width=18,
     )
+
+    # A wide, uneven burst reads better at app scale than a regular star.
+    art.star(center, 244, 82, 15, rotation=0.09, fill=(190, 36, 36, 255), width=18)
+    art.star(center, 212, 75, 14, rotation=0.31, fill=outer, width=13)
+    art.star(center, 164, 65, 12, rotation=0.18, fill=mid, width=10)
+    art.ellipse((198, 190, 118, 128), (255, 249, 220, 255), width=9)
+
+    # Secondary tongues make the blast feel directional and unstable.
+    art.polygon(
+        [(256, 30), (294, 106), (370, 94), (326, 168), (422, 210), (322, 242),
+         (384, 326), (286, 294), (252, 416), (216, 298), (120, 350), (178, 254),
+         (58, 210), (160, 174), (100, 86), (196, 112)],
+        fill=(239, 68, 22, 235),
+        outline=(30, 25, 36, 180),
+        width=9,
+    )
+    art.polygon(
+        [(256, 88), (292, 150), (342, 176), (294, 226), (340, 282), (256, 250),
+         (178, 290), (214, 224), (166, 172), (224, 146)],
+        fill=(255, 249, 220, 245),
+        outline=None,
+    )
+
+    for point, radius in [
+        ((58, 96), 29), ((444, 120), 34), ((76, 424), 31),
+        ((424, 430), 26), ((140, 54), 19), ((390, 64), 21),
+    ]:
+        art.star(point, radius, radius * 0.34, 7, fill=YELLOW, width=7)
+
+    for start, end, width in [
+        ((82, 154), (24, 78), 13), ((432, 154), (492, 70), 15),
+        ((96, 356), (36, 438), 12), ((424, 362), (486, 446), 11),
+    ]:
+        art.line([start, end], (250, 204, 21, 235), width)
+
+    for point, radius in [
+        ((176, 82), 11), ((344, 100), 9), ((124, 430), 10), ((392, 402), 12),
+    ]:
+        art.ellipse(
+            (point[0] - radius, point[1] - radius, radius * 2, radius * 2),
+            (30, 25, 36, 235),
+            outline=None,
+        )
 
 
 def draw_fire(art: Art) -> None:
@@ -572,20 +611,53 @@ def draw_shockwave(art: Art) -> None:
 
 
 def draw_mushroom_cloud(art: Art) -> None:
-    art.polygon(
-        [(214, 62), (298, 62), (324, 124), (330, 184), (182, 184), (188, 124)],
-        fill=(107, 114, 128, 255),
+    # A mushroom cloud needs mass before detail: broad cap, hot collar, tapered stem.
+    art.ellipse(
+        (24, 18, 464, 286),
+        (255, 176, 64, 48),
+        outline=(255, 226, 150, 82),
+        width=14,
     )
-    art.rounded((196, 168, 120, 42), 20, (75, 85, 99, 255))
-    art.ellipse((48, 208, 416, 168), GRAY)
-    art.ellipse((78, 224, 220, 112), (178, 185, 195, 255), outline=None)
-    art.ellipse((224, 226, 218, 108), (148, 155, 166, 255), outline=None)
-    art.ellipse((122, 288, 274, 82), (203, 213, 225, 235), outline=None)
-    art.ellipse((186, 330, 142, 56), (107, 114, 128, 235), outline=None)
-    art.star((256, 246), 145, 60, 16, fill=ORANGE, width=10)
-    art.star((256, 250), 88, 36, 12, fill=YELLOW, width=8)
-    for point, radius in [((86, 318), 19), ((420, 312), 21), ((152, 398), 16), ((360, 396), 18)]:
-        art.star(point, radius, radius * 0.4, 9, fill=(249, 115, 22, 190), width=6)
+    art.ellipse((36, 72, 220, 178), (148, 155, 166, 255))
+    art.ellipse((86, 20, 340, 236), (178, 185, 195, 255))
+    art.ellipse((252, 62, 224, 182), (203, 213, 225, 255))
+    art.ellipse((126, 40, 260, 140), (226, 232, 240, 235), outline=None)
+    art.ellipse((74, 156, 364, 132), (148, 155, 166, 255), outline=None)
+
+    art.polygon(
+        [(208, 226), (304, 226), (350, 400), (304, 474), (208, 474), (162, 400)],
+        fill=(120, 128, 140, 255),
+    )
+    art.polygon(
+        [(226, 246), (286, 246), (316, 394), (288, 446), (224, 446), (196, 394)],
+        fill=(168, 177, 188, 235),
+        outline=None,
+    )
+
+    art.star((256, 238), 166, 68, 17, rotation=0.14, fill=ORANGE, width=9)
+    art.star((256, 241), 102, 40, 13, rotation=0.31, fill=YELLOW, width=7)
+    art.ellipse((206, 212, 100, 50), (255, 249, 220, 225), outline=None)
+
+    for point, radius in [
+        ((80, 392), 43),
+        ((428, 390), 47),
+        ((162, 462), 35),
+        ((350, 468), 38),
+    ]:
+        art.ellipse(
+            (point[0] - radius, point[1] - radius, radius * 2, radius * 2),
+            (148, 155, 166, 225),
+            outline=None,
+        )
+    for point, radius in [((94, 436), 20), ((416, 438), 22), ((258, 486), 18)]:
+        art.star(
+            point,
+            radius,
+            radius * 0.42,
+            8,
+            fill=(249, 115, 22, 190),
+            width=6,
+        )
 
 
 def draw_zombie_tier(art: Art, tier: int) -> None:
@@ -735,6 +807,7 @@ ASSETS: dict[str, Callable[[Art], None]] = {
     "ui-exit": draw_exit,
     "effect-glass-shard": draw_glass_shard,
     "effect-water-drop": draw_water_drop,
+    "effect-explosion": draw_explosion,
     "effect-shockwave": draw_shockwave,
     "effect-mushroom-cloud": draw_mushroom_cloud,
     "effect-blood-splat": draw_blood_splat,
@@ -755,12 +828,41 @@ ASSET_SIZES: dict[str, tuple[int, int]] = {
     "wall-brick": (512, 88),
     "effect-shockwave": (512, 512),
     "effect-mushroom-cloud": (512, 512),
+    "effect-explosion": (512, 512),
     "creature-giant-zombie": (512, 512),
     "creature-zombie-tier-1": (512, 512),
     "creature-zombie-tier-2": (512, 512),
     "creature-zombie-tier-3": (512, 512),
     "creature-zombie-tier-4": (512, 512),
     "creature-zombie-tier-5": (512, 512),
+}
+
+# These are installed from curated external sources by fetch_external_art.py.
+# Keeping them out of this generator prevents later regeneration from replacing
+# the richer assets with simpler fallback art.
+EXTERNAL_ASSETS = {
+    "tool-hammer",
+    "tool-machine-gun",
+    "tool-saw",
+    "tool-water",
+    "tool-flame",
+    "tool-bomb",
+    "tool-eraser",
+    "tool-rocket",
+    "tool-nuke",
+    "tool-fist",
+    "tool-insect",
+    "tool-person",
+    "tool-vehicle",
+    "tool-animal",
+    "tool-anything",
+    "tool-wall",
+    "tool-target",
+    "tool-sparkle",
+    "ui-restore",
+    "ui-settings",
+    "ui-exit",
+    "effect-explosion",
 }
 
 
@@ -772,10 +874,25 @@ def main() -> None:
         default="Sources/DesktopDestruction/Resources/Art",
         help="Directory in which PNG assets are written",
     )
+    parser.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        help="Generate only named assets (repeatable)",
+    )
     args = parser.parse_args()
 
     output = Path(args.output)
+    selected = set(args.only)
+    unknown = selected.difference(ASSETS)
+    if unknown:
+        parser.error(f"unknown assets: {', '.join(sorted(unknown))}")
+
     for name, draw in sorted(ASSETS.items()):
+        if name in EXTERNAL_ASSETS:
+            continue
+        if selected and name not in selected:
+            continue
         size = ASSET_SIZES.get(name, (SIZE, SIZE))
         art = Art(width=size[0], height=size[1])
         draw(art)

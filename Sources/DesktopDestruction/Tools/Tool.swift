@@ -77,6 +77,25 @@ enum Tool: Int, CaseIterable {
         }
     }
 
+    var creatureDamage: CGFloat {
+        switch self {
+        case .hammer: return 12
+        case .machineGun: return 5
+        case .saw: return 8
+        case .fist: return 24
+        case .bomb: return 1000
+        case .nuke: return 100_000
+        default: return 0
+        }
+    }
+
+    var creatureDamageSource: CreatureDamageSource {
+        switch self {
+        case .bomb: return .explosion
+        default: return .weapon
+        }
+    }
+
     var cursorAssetName: String {
         switch self {
         case .machineGun: return "tool-target"

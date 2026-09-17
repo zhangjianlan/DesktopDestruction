@@ -28,18 +28,35 @@ struct CreatureActionContext {
     let isPanicking: Bool
     let isZombie: Bool
     let isVehicle: Bool
+    let isRadiationMonster: Bool
 }
 
 struct CreatureActionSystem {
     private(set) var state: CreatureActionKind = .idle
     private(set) var elapsed: Double = 0
+    private let animationPhase: Double
+    private var speedIntensity: CGFloat = 1
+    private var radiationMonster = false
 
     private var transientState: CreatureActionKind?
     private var transientElapsed: Double = 0
     private var transientDuration: Double = 0
 
+    init(animationPhase: Double = 0) {
+        self.animationPhase = animationPhase
+    }
+
     mutating func update(dt: Double, context: CreatureActionContext) -> CreatureActionKind {
         elapsed += dt
+        radiationMonster = context.isRadiationMonster
+        let targetIntensity = min(
+            1.7,
+            max(0.45, context.actualSpeed / max(1, context.baseSpeed))
+        )
+        speedIntensity = speedIntensity * 0.68 + targetIntensity * 0.32
+        if radiationMonster {
+            speedIntensity = max(speedIntensity, 1.15)
+        }
 
         if let transientState {
             transientElapsed += dt
@@ -124,7 +141,7 @@ struct CreatureActionSystem {
         rotatesWithHeading: Bool,
         facingLeft: Bool
     ) -> CGAffineTransform {
-        let time = CGFloat(elapsed)
+        let time = CGFloat(elapsed + animationPhase)
         var rotation: CGFloat = 0
         var scaleX: CGFloat = 1
         var scaleY: CGFloat = 1
@@ -149,11 +166,21 @@ struct CreatureActionSystem {
             scaleY = 1 - step * 0.045
             verticalOffset = abs(step) * bodySize * 0.035
         case .stalk:
-            let sway = sin(time * 3.2)
-            rotation = sway * 0.085
-            scaleX = 1 + sin(time * 2.4) * 0.03
-            scaleY = 1 - sin(time * 2.4) * 0.03
-            verticalOffset = abs(sway) * bodySize * 0.012
+            if radiationMonster {
+                let sway = sin(time * 2.15)
+                let stomp = abs(sin(time * 1.45))
+                rotation = sway * 0.125
+                scaleX = 1 + sin(time * 1.6) * 0.055
+                scaleY = 1 - sin(time * 1.6) * 0.05
+                verticalOffset = stomp * bodySize * 0.035
+                forwardOffset = sin(time * 0.9) * bodySize * 0.025
+            } else {
+                let sway = sin(time * 3.2)
+                rotation = sway * 0.085
+                scaleX = 1 + sin(time * 2.4) * 0.03
+                scaleY = 1 - sin(time * 2.4) * 0.03
+                verticalOffset = abs(sway) * bodySize * 0.012
+            }
         case .dance:
             let beat = sin(time * 6.4)
             rotation = beat * 0.18
@@ -236,6 +263,13 @@ struct CreatureActionSystem {
             verticalOffset = suspension * bodySize * 0.012
         }
 
+        let motionIntensity = state == .idle ? 1 : speedIntensity
+        rotation *= motionIntensity
+        scaleX = 1 + (scaleX - 1) * motionIntensity
+        scaleY = 1 + (scaleY - 1) * motionIntensity
+        forwardOffset *= motionIntensity
+        verticalOffset *= motionIntensity
+
         let headingUnitX = rotatesWithHeading ? cos(heading) : (facingLeft ? -1 : 1)
         let headingUnitY = rotatesWithHeading ? sin(heading) : 0
         let translation = CGAffineTransform(
@@ -249,4 +283,5 @@ struct CreatureActionSystem {
         }
         return transform
     }
+
 }

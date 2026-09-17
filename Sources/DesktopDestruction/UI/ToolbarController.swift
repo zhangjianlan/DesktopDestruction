@@ -38,16 +38,25 @@ final class ToolbarController {
         view.addSubview(stackView)
 
         for tool in Tool.allCases {
-            let button = makeEmojiButton(tool.emoji, title: tool.name) { [weak self] in
+            let button = makeAssetButton(tool.assetName, fallback: tool.emoji, title: tool.name) { [weak self] in
                 self?.onTool?(tool)
             }
             stackView.addView(button, in: .leading)
         }
 
         stackView.addView(makeSpacer(), in: .leading)
-        stackView.addView(makeEmojiButton("↺", title: "恢复") { [weak self] in self?.onRestore?() }, in: .leading)
-        stackView.addView(makeEmojiButton("⚙️", title: "设置") { [weak self] in self?.onSettings?() }, in: .leading)
-        stackView.addView(makeEmojiButton("✕", title: "退出") { [weak self] in self?.onExit?() }, in: .leading)
+        stackView.addView(
+            makeAssetButton("ui-restore", fallback: "↺", title: "恢复") { [weak self] in self?.onRestore?() },
+            in: .leading
+        )
+        stackView.addView(
+            makeAssetButton("ui-settings", fallback: "⚙️", title: "设置") { [weak self] in self?.onSettings?() },
+            in: .leading
+        )
+        stackView.addView(
+            makeAssetButton("ui-exit", fallback: "✕", title: "退出") { [weak self] in self?.onExit?() },
+            in: .leading
+        )
         showAndScheduleHide()
     }
 
@@ -66,16 +75,26 @@ final class ToolbarController {
         }
     }
 
-    private func makeEmojiButton(_ symbol: String, title label: String, handler: @escaping () -> Void) -> NSButton {
+    private func makeAssetButton(
+        _ assetName: String,
+        fallback symbol: String,
+        title label: String,
+        handler: @escaping () -> Void
+    ) -> NSButton {
         let button = ActionButton(title: "", target: nil, action: nil)
         button.isBordered = false
-        button.attributedTitle = NSAttributedString(
-            string: symbol,
-            attributes: [
-                .font: NSFont.systemFont(ofSize: 21, weight: .medium),
-                .foregroundColor: NSColor.white
-            ]
-        )
+        if let image = ArtAssets.image(named: assetName) {
+            button.image = NSImage(cgImage: image, size: NSSize(width: 30, height: 30))
+            button.imageScaling = .scaleProportionallyDown
+        } else {
+            button.attributedTitle = NSAttributedString(
+                string: symbol,
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: 21, weight: .medium),
+                    .foregroundColor: NSColor.white
+                ]
+            )
+        }
         button.toolTip = label
         button.setAccessibilityLabel(label)
         button.translatesAutoresizingMaskIntoConstraints = false
