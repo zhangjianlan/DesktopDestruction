@@ -751,7 +751,7 @@ final class DestructionController {
                 bounds.maxX - 56,
                 max(bounds.minX + 56, target.x - lateralSwing)
             ),
-            y: bounds.maxY + 68
+            y: bounds.minY - 68
         )
         let distance = hypot(target.x - start.x, target.y - start.y)
         let diagonal = max(1, hypot(bounds.width, bounds.height))
