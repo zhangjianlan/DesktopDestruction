@@ -69,6 +69,17 @@ final class CreatureSurvivalRulesTests: XCTestCase {
         )
     }
 
+    func testFreshVehicleHasShortCollisionGracePeriod() {
+        let car = CreatureActor(at: .zero, kind: .vehicle(.car))
+        let spawnTime = Date()
+
+        XCTAssertFalse(car.isCollisionEligible(now: spawnTime.addingTimeInterval(0.2)))
+        XCTAssertTrue(car.isCollisionEligible(now: spawnTime.addingTimeInterval(0.5)))
+
+        let person = CreatureActor(at: .zero, kind: .person(.walker))
+        XCTAssertTrue(person.isCollisionEligible(now: spawnTime))
+    }
+
     func testLongSurvivingAnimalKeepsSuperShieldSaves() {
         let animal = CreatureActor(at: .zero, kind: .animal(AnimalSpecies.all[0]))
         let canvas = DestructionCanvas()
@@ -211,7 +222,7 @@ final class CreatureSurvivalRulesTests: XCTestCase {
         XCTAssertTrue(zombie.isRadiationMonster)
         XCTAssertTrue(zombie.isAlive)
         XCTAssertEqual(zombie.radiationPower, 7)
-        XCTAssertGreaterThan(zombie.maximumHealth, 100_000)
+        XCTAssertEqual(zombie.maximumHealth, 13_500)
         XCTAssertGreaterThan(zombie.traits.bodySize, 500)
     }
 
@@ -290,7 +301,7 @@ final class CreatureSurvivalRulesTests: XCTestCase {
         XCTAssertTrue(zombie.isImmune(to: .weapon))
         XCTAssertTrue(zombie.isImmune(to: .fire))
         XCTAssertTrue(zombie.isImmune(to: .vehicleImpact))
-        XCTAssertTrue(zombie.isImmune(to: .explosion))
+        XCTAssertFalse(zombie.isImmune(to: .explosion))
         XCTAssertTrue(zombie.isImmune(to: .zombie(tier: 100)))
         XCTAssertFalse(zombie.applyDamage(1_000_000, from: .zero, source: .weapon))
         zombie.ignite()
@@ -299,6 +310,13 @@ final class CreatureSurvivalRulesTests: XCTestCase {
         XCTAssertFalse(zombie.killByFire(canvas: canvas))
         XCTAssertTrue(zombie.isAlive)
         XCTAssertEqual(zombie.healthFraction, 1)
+
+        var blasts = 0
+        while !zombie.applyDamage(Tool.bomb.creatureDamage, from: .zero, source: .explosion) {
+            blasts += 1
+            XCTAssertLessThan(blasts, 20)
+        }
+        XCTAssertEqual(blasts, 8)
 
         var affectedCreatureIDs = Set<UUID>()
         let result = NuclearBlastRules.resolve(

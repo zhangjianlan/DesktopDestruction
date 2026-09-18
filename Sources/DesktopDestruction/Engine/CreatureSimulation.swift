@@ -678,10 +678,13 @@ enum CreatureDamageSource {
 }
 
 final class CreatureActor {
+    private static let vehicleCollisionGraceDuration: TimeInterval = 0.45
+
     let id = UUID()
     let kind: CreatureKind
     let layer = CALayer()
     private let createdAt = Date()
+    private let collisionEligibleAt: Date?
     private(set) var traits: CreatureTraits
     private(set) var isAlive = true
     private(set) var zombieTier = 0
@@ -735,10 +738,18 @@ final class CreatureActor {
         maximumHealth > 0 ? currentHealth / maximumHealth : 0
     }
 
+    func isCollisionEligible(now: Date = Date()) -> Bool {
+        guard let collisionEligibleAt else { return true }
+        return now >= collisionEligibleAt
+    }
+
     init(at point: CGPoint, kind: CreatureKind) {
         self.kind = kind
         self.position = point
         self.baseTraits = kind.traits
+        self.collisionEligibleAt = kind.isVehicle
+            ? createdAt.addingTimeInterval(Self.vehicleCollisionGraceDuration)
+            : nil
         self.traits = baseTraits
         var state = UInt32.random(in: 1...UInt32.max)
         heading = Self.nextNavigationValue(&state) * 2 * .pi
@@ -843,7 +854,14 @@ final class CreatureActor {
     @discardableResult
     func isImmune(to source: CreatureDamageSource) -> Bool {
         if isRadiationMonster {
-            return true
+            switch source {
+            case .weapon, .fire, .vehicleImpact:
+                return true
+            case .zombie:
+                return true
+            case .explosion:
+                return false
+            }
         }
         switch source {
         case .weapon:
@@ -1010,7 +1028,7 @@ final class CreatureActor {
             explosionRadius: 0,
             deathEffect: .blood
         )
-        maximumHealth = 24_000 + power * 12_000
+        maximumHealth = 3_000 + power * 1_500
         currentHealth = maximumHealth
         updateAppearance()
     }

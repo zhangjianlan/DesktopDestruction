@@ -75,8 +75,8 @@ cat > "$STAGING_APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleIdentifier</key><string>com.codex.desktopdestruction</string>
   <key>CFBundleName</key><string>DesktopDestruction</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.6.0</string>
-  <key>CFBundleVersion</key><string>8</string>
+  <key>CFBundleShortVersionString</key><string>1.6.1</string>
+  <key>CFBundleVersion</key><string>9</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSUIElement</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>

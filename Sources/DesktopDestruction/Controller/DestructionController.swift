@@ -1261,7 +1261,7 @@ final class DestructionController {
     }
 
     @discardableResult
-    private func explodeVehicle(_ vehicle: CreatureActor) -> Int {
+    private func explodeVehicle(_ vehicle: CreatureActor, now: Date = Date()) -> Int {
         guard vehicle.isAlive else { return 0 }
         let point = vehicle.currentPosition
         let radius = max(82, vehicle.traits.explosionRadius)
@@ -1271,7 +1271,8 @@ final class DestructionController {
         let nearbyCreatures = creatures.filter { $0.isAlive && $0.hitTest(point, radius: radius) }
         for creature in nearbyCreatures {
             if creature.kind.isVehicle {
-                affected += explodeVehicle(creature)
+                guard creature.isCollisionEligible(now: now) else { continue }
+                affected += explodeVehicle(creature, now: now)
             } else {
                 guard !creature.isImmune(to: .explosion) else { continue }
                 if creature.applyDamage(1000, from: point, source: .explosion) {
@@ -1345,6 +1346,7 @@ final class DestructionController {
     }
 
     private func resolveVehicleCollisions(spatialGrid: CreatureSpatialGrid) {
+        let now = Date()
         var hadCollision = false
         var vehicleCollisionPairs: [(vehicle: CreatureActor, other: CreatureActor)] = []
         var eliteZombieCollisions: [CreatureActor] = []
@@ -1352,6 +1354,7 @@ final class DestructionController {
 
         for vehicle in creatures {
             guard vehicle.isAlive && vehicle.kind.isVehicle else { continue }
+            guard vehicle.isCollisionEligible(now: now) else { continue }
             for entry in spatialGrid.nearbyEntries(
                 point: vehicle.currentPosition,
                 radius: vehicle.traits.hitRadius
@@ -1363,6 +1366,7 @@ final class DestructionController {
                 }
 
                 if other.kind.isVehicle {
+                    guard other.isCollisionEligible(now: now) else { continue }
                     let pair = Set([vehicle.id, other.id])
                     guard seenVehiclePairs.insert(pair).inserted else { continue }
                     vehicleCollisionPairs.append((vehicle, other))
@@ -1741,7 +1745,8 @@ final class DestructionController {
             )
             for vehicle in nearbyCreatures
             where vehicle.isAlive && vehicle.kind.isVehicle && vehicle.id != giant.id {
-                if vehicle.hitTest(giant.currentPosition, radius: giant.traits.hitRadius) {
+                if vehicle.isCollisionEligible()
+                    && vehicle.hitTest(giant.currentPosition, radius: giant.traits.hitRadius) {
                     explodeVehicle(vehicle)
                 }
             }
