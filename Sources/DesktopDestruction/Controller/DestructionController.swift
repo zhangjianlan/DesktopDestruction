@@ -801,7 +801,6 @@ final class DestructionController {
             self.damageWalls(at: point, radius: radius * 0.9, amount: 100)
             ParticleFactory.smoke(at: point, count: 24, in: self.canvas)
             ParticleFactory.dust(at: point, count: 30, in: self.canvas)
-            AudioManager.shared.play("explosion", gain: 0.45, rate: 0.90)
             ScreenShake.shake(self.canvas.root, intensity: 16, duration: 0.34)
         }
     }
@@ -899,7 +898,6 @@ final class DestructionController {
             }
             self.damageWalls(at: point, radius: radius, amount: 180)
             ParticleFactory.smoke(at: point, count: 38, in: self.canvas)
-            AudioManager.shared.play("explosion", gain: 0.40, rate: 0.88)
             ScreenShake.shake(self.canvas.root, intensity: 18, duration: 0.5)
         }
     }

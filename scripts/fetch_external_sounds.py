@@ -35,7 +35,6 @@ SAMPLES = {
     "impact_glass_heavy": ("impact", "Audio/impactGlass_heavy_000.ogg"),
     "impact_metal_light": ("impact", "Audio/impactMetal_light_000.ogg"),
     "impact_metal_heavy": ("impact", "Audio/impactMetal_heavy_000.ogg"),
-    "impact_mining": ("impact", "Audio/impactMining_004.ogg"),
     "impact_wood_heavy": ("impact", "Audio/impactWood_heavy_003.ogg"),
     "impact_punch_heavy": ("impact", "Audio/impactPunch_heavy_000.ogg"),
     "impact_punch_medium": ("impact", "Audio/impactPunch_medium_000.ogg"),

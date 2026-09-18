@@ -318,6 +318,20 @@ def normalize(samples, peak=0.85):
     return [sample * scale for sample in samples]
 
 
+def dry_impact(samples, duration, decay, release=0.012):
+    """Keep the source transient while removing room-reverb tails."""
+    output = fit(samples, duration)
+    release_count = max(1, seconds(release))
+    for index, sample in enumerate(output):
+        time = index / SAMPLE_RATE
+        envelope = math.exp(-time * decay)
+        if index >= len(output) - release_count:
+            remaining = (len(output) - index) / release_count
+            envelope *= remaining
+        output[index] = sample * envelope
+    return output
+
+
 def loopify(samples, fade_ms=20):
     count = int(SAMPLE_RATE * fade_ms / 1000)
     if count <= 0 or len(samples) <= count:
@@ -333,13 +347,14 @@ def generate():
     rng = random.Random(20260915)
     external = load_external_samples()
 
-    # A mining impact has the natural transient, debris, and room tail that a
-    # synthesized hammer body lacks. Wood adds weight without masking the hit.
+    # Wood and metal impacts are naturally dry; the fast decay prevents any
+    # trailing room sound from turning the hammer into an echo.
     hammer = mix(
-        scaled(external["impact_mining"], 1.0),
-        scaled(external["impact_wood_heavy"], 0.38),
+        scaled(external["impact_wood_heavy"], 1.0),
+        scaled(external["impact_metal_heavy"], 0.28),
         master=0.92,
     )
+    hammer = dry_impact(hammer, duration=0.28, decay=12.0)
     write_wav("hammer_hit", normalize(hammer, 0.90))
 
     glass_tail = []
@@ -476,14 +491,14 @@ def generate():
     flame = mix(flame_external, flame, master=0.72)
     write_wav("flame_loop", normalize(loopify(flame, 45), 0.74))
 
-    # Keep the external samples intact apart from gain staging and limiting.
-    # Earlier versions low-passed the sample and added a synthetic rumble,
-    # which made the blast dull and detached from the visual impact.
+    # The source packs are heavily reverbed. Keep only the attack portion and
+    # use a fast exponential decay so the blast ends instead of echoing away.
     explosion = mix(
-        scaled(external["explosion_crunch_long"], 0.92),
+        scaled(external["explosion_crunch"], 0.92),
         scaled(external["explosion_low"], 0.58),
         master=0.88,
     )
+    explosion = dry_impact(explosion, duration=0.58, decay=4.8)
     write_wav("explosion", normalize(explosion, 0.84))
 
     vehicle_explosion = mix(
@@ -492,6 +507,7 @@ def generate():
         scaled(external["impact_metal_heavy"], 0.38),
         master=0.86,
     )
+    vehicle_explosion = dry_impact(vehicle_explosion, duration=0.46, decay=6.2)
     write_wav("vehicle_explosion", normalize(vehicle_explosion, 0.84))
     # Preserve the generator's historical RNG sequence so later sounds remain
     # byte-identical when only the explosion mixes are changed.

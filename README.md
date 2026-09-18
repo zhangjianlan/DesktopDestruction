@@ -68,7 +68,7 @@ python3 scripts/generate_art.py Sources/DesktopDestruction/Resources/Art
 
 ## 音效资源
 
-核心音效使用 Kenney CC0 采样与项目内合成层混合：锤击直接保留 Kenney 矿镐冲击与木头重量层，玻璃有真实冲击层，机枪包含枪口爆压、机械回拉和低频后坐，普通爆炸和车辆爆炸直接保留 Kenney 原始爆压采样，只做增益与防削波处理，生物、僵尸和动物有独立的受击与死亡反馈。生成脚本依赖 Python 3 与 `ffmpeg`：
+核心音效使用 Kenney CC0 采样与项目内合成层混合：锤击使用短木头与金属冲击，爆炸保留采样起始爆压并用快速衰减去除残响尾巴，玻璃有真实冲击层，机枪包含枪口爆压、机械回拉和低频后坐，生物、僵尸和动物有独立的受击与死亡反馈。生成脚本依赖 Python 3 与 `ffmpeg`：
 
 ```bash
 python3 scripts/fetch_external_sounds.py
