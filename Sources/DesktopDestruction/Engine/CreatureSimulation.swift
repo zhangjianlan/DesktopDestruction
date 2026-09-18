@@ -677,8 +677,26 @@ enum CreatureDamageSource {
     case zombie(tier: Int)
 }
 
+enum VehicleImpactRules {
+    static let vehicleThreshold: CGFloat = 105
+    static let eliteMonsterThreshold: CGFloat = 65
+
+    static func isHighEnergyImpact(
+        relativeVelocity: CGPoint,
+        separation: CGPoint,
+        threshold: CGFloat
+    ) -> Bool {
+        let distance = hypot(separation.x, separation.y)
+        guard distance > 1 else { return false }
+        let approachSpeed = (
+            relativeVelocity.x * separation.x + relativeVelocity.y * separation.y
+        ) / distance
+        return approachSpeed >= threshold
+    }
+}
+
 final class CreatureActor {
-    private static let vehicleCollisionGraceDuration: TimeInterval = 0.45
+    private static let vehicleCollisionGraceDuration: TimeInterval = 1.2
 
     let id = UUID()
     let kind: CreatureKind
@@ -702,6 +720,8 @@ final class CreatureActor {
     private var position: CGPoint
     private var heading: CGFloat
     private var speedFactor: CGFloat = 1
+    private(set) var currentVelocity = CGPoint.zero
+    private(set) var currentSpeed: CGFloat = 0
     private var nextTurn = Date()
     private var navigationState: UInt32 = 1
     private var navigationTargetHeading: CGFloat = 0
@@ -741,6 +761,19 @@ final class CreatureActor {
     func isCollisionEligible(now: Date = Date()) -> Bool {
         guard let collisionEligibleAt else { return true }
         return now >= collisionEligibleAt
+    }
+
+    func isHighEnergyVehicleImpact(
+        relativeVelocity: CGPoint,
+        separation: CGPoint,
+        now: Date = Date()
+    ) -> Bool {
+        guard kind.isVehicle, isCollisionEligible(now: now) else { return false }
+        return VehicleImpactRules.isHighEnergyImpact(
+            relativeVelocity: relativeVelocity,
+            separation: separation,
+            threshold: VehicleImpactRules.vehicleThreshold
+        )
     }
 
     init(at point: CGPoint, kind: CreatureKind) {
@@ -1277,6 +1310,11 @@ final class CreatureActor {
             position.x - previousPosition.x,
             position.y - previousPosition.y
         ) / CGFloat(dt)
+        currentVelocity = CGPoint(
+            x: (position.x - previousPosition.x) / CGFloat(dt),
+            y: (position.y - previousPosition.y) / CGFloat(dt)
+        )
+        currentSpeed = actualSpeed
         _ = actionSystem.update(
             dt: dt,
             context: CreatureActionContext(

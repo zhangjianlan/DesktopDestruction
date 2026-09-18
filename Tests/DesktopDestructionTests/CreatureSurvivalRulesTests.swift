@@ -73,11 +73,63 @@ final class CreatureSurvivalRulesTests: XCTestCase {
         let car = CreatureActor(at: .zero, kind: .vehicle(.car))
         let spawnTime = Date()
 
-        XCTAssertFalse(car.isCollisionEligible(now: spawnTime.addingTimeInterval(0.2)))
-        XCTAssertTrue(car.isCollisionEligible(now: spawnTime.addingTimeInterval(0.5)))
+        XCTAssertFalse(car.isCollisionEligible(now: spawnTime.addingTimeInterval(0.8)))
+        XCTAssertTrue(car.isCollisionEligible(now: spawnTime.addingTimeInterval(1.3)))
 
         let person = CreatureActor(at: .zero, kind: .person(.walker))
         XCTAssertTrue(person.isCollisionEligible(now: spawnTime))
+    }
+
+    func testVehicleCollisionRequiresHighEnergyImpact() {
+        let car = CreatureActor(at: .zero, kind: .vehicle(.car))
+        let spawnTime = Date()
+        let separation = CGPoint(x: 120, y: 0)
+
+        XCTAssertFalse(
+            car.isHighEnergyVehicleImpact(
+                relativeVelocity: CGPoint(x: 240, y: 0),
+                separation: separation,
+                now: spawnTime.addingTimeInterval(0.2)
+            )
+        )
+        XCTAssertFalse(
+            car.isHighEnergyVehicleImpact(
+                relativeVelocity: CGPoint(x: 28, y: 0),
+                separation: separation,
+                now: spawnTime.addingTimeInterval(1.3)
+            )
+        )
+        XCTAssertTrue(
+            car.isHighEnergyVehicleImpact(
+                relativeVelocity: CGPoint(x: 128, y: 0),
+                separation: separation,
+                now: spawnTime.addingTimeInterval(1.3)
+            )
+        )
+    }
+
+    func testVehicleImpactIgnoresOverlapsAndSeparatingVehicles() {
+        XCTAssertFalse(
+            VehicleImpactRules.isHighEnergyImpact(
+                relativeVelocity: CGPoint(x: 280, y: 0),
+                separation: .zero,
+                threshold: VehicleImpactRules.vehicleThreshold
+            )
+        )
+        XCTAssertFalse(
+            VehicleImpactRules.isHighEnergyImpact(
+                relativeVelocity: CGPoint(x: -180, y: 0),
+                separation: CGPoint(x: 120, y: 0),
+                threshold: VehicleImpactRules.vehicleThreshold
+            )
+        )
+        XCTAssertTrue(
+            VehicleImpactRules.isHighEnergyImpact(
+                relativeVelocity: CGPoint(x: 180, y: 0),
+                separation: CGPoint(x: 120, y: 0),
+                threshold: VehicleImpactRules.vehicleThreshold
+            )
+        )
     }
 
     func testLongSurvivingAnimalKeepsSuperShieldSaves() {

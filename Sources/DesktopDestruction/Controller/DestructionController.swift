@@ -957,12 +957,61 @@ final class DestructionController {
     private func placeVehicle(at point: CGPoint) {
         guard creatures.count < 220 else { return }
         let species = VehicleSpecies.allCases.randomElement() ?? .car
-        let actor = CreatureActor(at: point, kind: .vehicle(species))
+        guard let spawnPoint = findVehicleSpawnPoint(at: point, species: species) else {
+            setHUD("🚗 周围空间不足，请换个位置放车")
+            AudioManager.shared.play("switch_click", gain: 0.24, rate: 0.58)
+            return
+        }
+        let actor = CreatureActor(at: spawnPoint, kind: .vehicle(species))
         canvas.addTransient(actor.layer)
         creatures.append(actor)
         ensureSimulation()
-        ParticleFactory.dust(at: point, count: 10, in: canvas)
+        ParticleFactory.dust(at: spawnPoint, count: 10, in: canvas)
         AudioManager.shared.play("switch_click", gain: 0.55, rate: 0.72)
+    }
+
+    private func findVehicleSpawnPoint(at point: CGPoint, species: VehicleSpecies) -> CGPoint? {
+        let hitRadius = species.traits.hitRadius
+        let margin = hitRadius + 24
+        let bounds = view.bounds
+        let searchableBounds = CGRect(
+            x: bounds.minX + margin,
+            y: bounds.minY + margin,
+            width: max(0, bounds.width - margin * 2),
+            height: max(0, bounds.height - margin * 2)
+        )
+        guard searchableBounds.width > 0, searchableBounds.height > 0 else { return nil }
+
+        let clearance = hitRadius * 1.35
+        let maximumSearchRadius = min(
+            hypot(searchableBounds.width, searchableBounds.height) / 2,
+            max(320, clearance * 3)
+        )
+
+        for step in 0..<72 {
+            let radius = step == 0
+                ? 0
+                : min(maximumSearchRadius, CGFloat(step) * clearance * 0.55)
+            let angle = CGFloat(step) * 2.399963
+            let candidate = step == 0
+                ? point
+                : CGPoint(
+                    x: point.x + cos(angle) * radius,
+                    y: point.y + sin(angle) * radius
+                )
+            guard searchableBounds.contains(candidate) else { continue }
+
+            let isClear = creatures.allSatisfy { creature in
+                guard creature.isAlive else { return true }
+                let blocksVehicleSpawn = creature.kind.isVehicle || creature.isEliteZombie
+                return !blocksVehicleSpawn || !creature.hitTest(candidate, radius: clearance)
+            }
+            if isClear {
+                return candidate
+            }
+        }
+
+        return nil
     }
 
     private func placeAnimal(at point: CGPoint) {
@@ -1272,6 +1321,7 @@ final class DestructionController {
         for creature in nearbyCreatures {
             if creature.kind.isVehicle {
                 guard creature.isCollisionEligible(now: now) else { continue }
+                guard creature.hitTest(point, radius: radius * 0.62) else { continue }
                 affected += explodeVehicle(creature, now: now)
             } else {
                 guard !creature.isImmune(to: .explosion) else { continue }
@@ -1367,6 +1417,21 @@ final class DestructionController {
 
                 if other.kind.isVehicle {
                     guard other.isCollisionEligible(now: now) else { continue }
+                    let separation = CGPoint(
+                        x: other.currentPosition.x - vehicle.currentPosition.x,
+                        y: other.currentPosition.y - vehicle.currentPosition.y
+                    )
+                    let relativeVelocity = CGPoint(
+                        x: vehicle.currentVelocity.x - other.currentVelocity.x,
+                        y: vehicle.currentVelocity.y - other.currentVelocity.y
+                    )
+                    guard vehicle.isHighEnergyVehicleImpact(
+                        relativeVelocity: relativeVelocity,
+                        separation: separation,
+                        now: now
+                    ) else {
+                        continue
+                    }
                     let pair = Set([vehicle.id, other.id])
                     guard seenVehiclePairs.insert(pair).inserted else { continue }
                     vehicleCollisionPairs.append((vehicle, other))
@@ -1745,9 +1810,23 @@ final class DestructionController {
             )
             for vehicle in nearbyCreatures
             where vehicle.isAlive && vehicle.kind.isVehicle && vehicle.id != giant.id {
+                let separation = CGPoint(
+                    x: giant.currentPosition.x - vehicle.currentPosition.x,
+                    y: giant.currentPosition.y - vehicle.currentPosition.y
+                )
+                let relativeVelocity = CGPoint(
+                    x: vehicle.currentVelocity.x - giant.currentVelocity.x,
+                    y: vehicle.currentVelocity.y - giant.currentVelocity.y
+                )
                 if vehicle.isCollisionEligible()
                     && vehicle.hitTest(giant.currentPosition, radius: giant.traits.hitRadius) {
-                    explodeVehicle(vehicle)
+                    if VehicleImpactRules.isHighEnergyImpact(
+                        relativeVelocity: relativeVelocity,
+                        separation: separation,
+                        threshold: VehicleImpactRules.eliteMonsterThreshold
+                    ) {
+                        explodeVehicle(vehicle)
+                    }
                 }
             }
 
