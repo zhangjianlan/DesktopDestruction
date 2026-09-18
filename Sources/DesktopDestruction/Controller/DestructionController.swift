@@ -785,7 +785,7 @@ final class DestructionController {
         ParticleFactory.sparks(at: point, count: 56, in: canvas)
         ParticleFactory.smoke(at: point, count: 42, in: canvas)
         ParticleFactory.glassShards(at: point, count: 18, in: canvas)
-        AudioManager.shared.play("explosion", gain: 1, rate: 0.72)
+        AudioManager.shared.play("explosion", gain: 1, rate: 0.98)
         AudioManager.shared.play("glass_shatter", gain: 0.24, rate: 0.68)
         ScreenShake.shake(canvas.root, intensity: 30, duration: 0.58)
 
@@ -801,7 +801,7 @@ final class DestructionController {
             self.damageWalls(at: point, radius: radius * 0.9, amount: 100)
             ParticleFactory.smoke(at: point, count: 24, in: self.canvas)
             ParticleFactory.dust(at: point, count: 30, in: self.canvas)
-            AudioManager.shared.play("explosion", gain: 0.58, rate: 0.46)
+            AudioManager.shared.play("explosion", gain: 0.45, rate: 0.90)
             ScreenShake.shake(self.canvas.root, intensity: 16, duration: 0.34)
         }
     }
@@ -899,7 +899,7 @@ final class DestructionController {
             }
             self.damageWalls(at: point, radius: radius, amount: 180)
             ParticleFactory.smoke(at: point, count: 38, in: self.canvas)
-            AudioManager.shared.play("explosion", gain: 0.48, rate: 0.38)
+            AudioManager.shared.play("explosion", gain: 0.40, rate: 0.88)
             ScreenShake.shake(self.canvas.root, intensity: 18, duration: 0.5)
         }
     }
@@ -1389,7 +1389,7 @@ final class DestructionController {
         AudioManager.shared.play(
             "vehicle_explosion",
             gain: 0.88,
-            rate: Float.random(in: 0.78...0.90)
+            rate: Float.random(in: 0.94...1.06)
         )
         AudioManager.shared.play("glass_shatter", gain: 0.36, rate: 1.08)
         ScreenShake.shake(canvas.root, intensity: 21, duration: 0.35)

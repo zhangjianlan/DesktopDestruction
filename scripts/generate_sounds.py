@@ -318,15 +318,6 @@ def normalize(samples, peak=0.85):
     return [sample * scale for sample in samples]
 
 
-def soften_explosion(samples, strength=7, attack=0.028, floor=0.25):
-    softened = lowpass(samples, strength)
-    attack_count = max(1, seconds(attack))
-    return [
-        sample * (floor + (1.0 - floor) * min(1.0, index / attack_count))
-        for index, sample in enumerate(softened)
-    ]
-
-
 def loopify(samples, fade_ms=20):
     count = int(SAMPLE_RATE * fade_ms / 1000)
     if count <= 0 or len(samples) <= count:
@@ -499,49 +490,27 @@ def generate():
     flame = mix(flame_external, flame, master=0.72)
     write_wav("flame_loop", normalize(loopify(flame, 45), 0.74))
 
-    explosion = []
-    explosion_body = []
-    rumble_state = 0.0
-    for index in range(seconds(1.75)):
-        time = index / SAMPLE_RATE
-        boom = (
-            math.sin(2 * math.pi * 47 * time) * 0.58
-            + math.sin(2 * math.pi * 82 * time) * 0.30
-        )
-        raw = rng.uniform(-1, 1)
-        rumble_state = rumble_state * 0.989 + raw * 0.037
-        value = (boom + rumble_state * 0.75) * math.exp(-time * 2.3)
-        explosion_body.append(math.tanh(value * 1.35))
-    explosion_crunch = soften_explosion(external["explosion_crunch"])
-    explosion_low = lowpass(external["explosion_low"], 2)
+    # Keep the external samples intact apart from gain staging and limiting.
+    # Earlier versions low-passed the sample and added a synthetic rumble,
+    # which made the blast dull and detached from the visual impact.
     explosion = mix(
-        scaled(explosion_crunch, 0.68),
-        scaled(explosion_low, 0.95),
-        explosion_body,
-        master=0.70,
+        scaled(external["explosion_crunch_long"], 0.92),
+        scaled(external["explosion_low"], 0.58),
+        master=0.88,
     )
     write_wav("explosion", normalize(explosion, 0.84))
 
-    vehicle_debris = []
-    debris_state = 0.0
-    for index in range(seconds(1.9)):
-        time = index / SAMPLE_RATE
-        raw = rng.uniform(-1, 1)
-        debris_state += (raw - debris_state) / (3.0 + 18.0 * math.exp(-time * 3.0))
-        vehicle_debris.append(
-            debris_state
-            * math.exp(-time * 1.9)
-            * (0.85 + 0.15 * math.sin(2 * math.pi * 17.0 * time))
-        )
     vehicle_explosion = mix(
-        scaled(explosion_crunch, 0.60),
-        scaled(explosion_low, 1.0),
-        scaled(external["impact_metal_heavy"], 0.55),
-        explosion_body,
-        delayed(vehicle_debris, 0.075),
-        master=0.70,
+        scaled(external["explosion_crunch_medium"], 0.88),
+        scaled(external["explosion_low_short"], 0.68),
+        scaled(external["impact_metal_heavy"], 0.38),
+        master=0.86,
     )
     write_wav("vehicle_explosion", normalize(vehicle_explosion, 0.84))
+    # Preserve the generator's historical RNG sequence so later sounds remain
+    # byte-identical when only the explosion mixes are changed.
+    for _ in range(seconds(1.75) + seconds(1.9)):
+        rng.uniform(-1, 1)
 
     rocket = []
     previous = 0.0
