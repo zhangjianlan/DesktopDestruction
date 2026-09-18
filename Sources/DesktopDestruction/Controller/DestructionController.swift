@@ -965,7 +965,7 @@ final class DestructionController {
         let hitCreatures = creatures.filter { $0.hitTest(point, radius: radius) }
         for creature in hitCreatures {
             if creature.kind.isVehicle {
-                affected += damageVehicle(creature, amount: 0.8, at: point)
+                affected += damageVehicle(creature, amount: 1.8, at: point, source: .fire)
             } else {
                 creature.ignite()
                 affected += 1
@@ -1221,8 +1221,8 @@ final class DestructionController {
         igniteFire(at: point, intensity: 1.4, force: true)
         AudioManager.shared.play(
             "vehicle_explosion",
-            gain: 0.98,
-            rate: Float.random(in: 0.96...1.10)
+            gain: 0.88,
+            rate: Float.random(in: 0.78...0.90)
         )
         AudioManager.shared.play("glass_shatter", gain: 0.36, rate: 1.08)
         ScreenShake.shake(canvas.root, intensity: 21, duration: 0.35)

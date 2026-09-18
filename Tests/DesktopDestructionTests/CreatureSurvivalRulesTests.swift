@@ -46,6 +46,29 @@ final class CreatureSurvivalRulesTests: XCTestCase {
         XCTAssertTrue(person.applyDamage(3, from: .zero))
     }
 
+    func testVehicleRequiresRepeatedWeaponDamageBeforeExploding() {
+        let car = CreatureActor(at: .zero, kind: .vehicle(.car))
+
+        XCTAssertFalse(car.applyDamage(Tool.hammer.creatureDamage, from: .zero))
+        XCTAssertFalse(car.applyDamage(Tool.machineGun.creatureDamage, from: .zero))
+        XCTAssertGreaterThan(car.healthFraction, 0.5)
+
+        var shots = 0
+        while !car.applyDamage(Tool.machineGun.creatureDamage, from: .zero) {
+            shots += 1
+        }
+        XCTAssertGreaterThan(shots, 1)
+
+        let bombTarget = CreatureActor(at: .zero, kind: .vehicle(.car))
+        XCTAssertTrue(
+            bombTarget.applyDamage(
+                Tool.bomb.creatureDamage,
+                from: .zero,
+                source: .explosion
+            )
+        )
+    }
+
     func testLongSurvivingAnimalKeepsSuperShieldSaves() {
         let animal = CreatureActor(at: .zero, kind: .animal(AnimalSpecies.all[0]))
         let canvas = DestructionCanvas()

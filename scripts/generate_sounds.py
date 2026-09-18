@@ -318,6 +318,15 @@ def normalize(samples, peak=0.85):
     return [sample * scale for sample in samples]
 
 
+def soften_explosion(samples, strength=7, attack=0.028, floor=0.25):
+    softened = lowpass(samples, strength)
+    attack_count = max(1, seconds(attack))
+    return [
+        sample * (floor + (1.0 - floor) * min(1.0, index / attack_count))
+        for index, sample in enumerate(softened)
+    ]
+
+
 def loopify(samples, fade_ms=20):
     count = int(SAMPLE_RATE * fade_ms / 1000)
     if count <= 0 or len(samples) <= count:
@@ -465,13 +474,15 @@ def generate():
         rumble_state = rumble_state * 0.989 + raw * 0.037
         value = (boom + rumble_state * 0.75) * math.exp(-time * 2.3)
         explosion_body.append(math.tanh(value * 1.35))
+    explosion_crunch = soften_explosion(external["explosion_crunch"])
+    explosion_low = lowpass(external["explosion_low"], 2)
     explosion = mix(
-        scaled(external["explosion_crunch"], 1.0),
-        scaled(external["explosion_low"], 0.82),
+        scaled(explosion_crunch, 0.68),
+        scaled(explosion_low, 0.95),
         explosion_body,
-        master=0.78,
+        master=0.70,
     )
-    write_wav("explosion", normalize(explosion, 0.90))
+    write_wav("explosion", normalize(explosion, 0.84))
 
     vehicle_debris = []
     debris_state = 0.0
@@ -485,14 +496,14 @@ def generate():
             * (0.85 + 0.15 * math.sin(2 * math.pi * 17.0 * time))
         )
     vehicle_explosion = mix(
-        scaled(external["explosion_crunch"], 1.0),
-        scaled(external["explosion_low"], 0.95),
+        scaled(explosion_crunch, 0.60),
+        scaled(explosion_low, 1.0),
         scaled(external["impact_metal_heavy"], 0.55),
         explosion_body,
         delayed(vehicle_debris, 0.075),
-        master=0.74,
+        master=0.70,
     )
-    write_wav("vehicle_explosion", normalize(vehicle_explosion, 0.90))
+    write_wav("vehicle_explosion", normalize(vehicle_explosion, 0.84))
 
     rocket = []
     previous = 0.0

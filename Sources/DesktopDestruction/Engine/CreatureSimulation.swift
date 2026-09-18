@@ -836,7 +836,7 @@ final class CreatureActor {
         if kind.isPerson { return 3 }
         if kind.isAnimal { return max(2, traits.bodySize / 34) }
         if kind.isInsect { return 1 }
-        if kind.isVehicle { return max(5, (traits.explosionRadius / 18).rounded()) }
+        if kind.isVehicle { return max(34, traits.explosionRadius * 0.46) }
         return 1
     }
 
