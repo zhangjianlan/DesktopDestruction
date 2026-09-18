@@ -745,18 +745,21 @@ final class DestructionController {
 
     private func throwPoop(to target: CGPoint) {
         let bounds = view.bounds
-        let startsFromLeft = target.x >= bounds.midX
+        let lateralSwing = min(220, max(130, bounds.width * 0.18))
         let start = CGPoint(
-            x: startsFromLeft ? bounds.minX + 36 : bounds.maxX - 36,
-            y: bounds.maxY + 42
+            x: min(
+                bounds.maxX - 56,
+                max(bounds.minX + 56, target.x - lateralSwing)
+            ),
+            y: bounds.maxY + 68
         )
         let distance = hypot(target.x - start.x, target.y - start.y)
         let diagonal = max(1, hypot(bounds.width, bounds.height))
         let duration = 0.64 + CGFloat(0.30) * min(1, distance / diagonal)
-        let arcHeight = min(260, max(105, distance * 0.34))
+        let arcHeight = min(280, max(120, distance * 0.34))
         let control = CGPoint(
-            x: (start.x + target.x) / 2,
-            y: min(start.y, target.y) - arcHeight
+            x: target.x + lateralSwing * 0.48,
+            y: target.y - arcHeight
         )
 
         let path = CGMutablePath()
@@ -817,10 +820,10 @@ final class DestructionController {
             squashY.duration = 0.14
             poop.add(squashY, forKey: "poopSquashY")
 
-            if let splat = DamageRenderer.renderPoopSplat(at: target, radius: 36) {
+            if let splat = DamageRenderer.renderPoopSplat(at: target, radius: 54) {
                 self.canvas.addDamage(image: splat.0, frame: splat.1, permanent: true)
             }
-            ParticleFactory.poopSpray(at: target, count: 34, in: self.canvas)
+            ParticleFactory.poopSpray(at: target, count: 42, in: self.canvas)
             AudioManager.shared.play("poop_splat", gain: 1, minimumInterval: 0.03)
             ScreenShake.shake(self.canvas.root, intensity: 5, duration: 0.13)
         }

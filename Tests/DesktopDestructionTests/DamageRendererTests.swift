@@ -16,13 +16,13 @@ final class DamageRendererTests: XCTestCase {
 
     func testPoopSplatProducesBoundedImage() {
         let point = CGPoint(x: 120, y: 86)
-        let rendered = DamageRenderer.renderPoopSplat(at: point, radius: 36)
+        let rendered = DamageRenderer.renderPoopSplat(at: point, radius: 54)
 
         XCTAssertNotNil(rendered?.0)
-        XCTAssertEqual(rendered?.1.minX ?? 0, point.x - 70.2, accuracy: 0.1)
-        XCTAssertEqual(rendered?.1.minY ?? 0, point.y - 70.2, accuracy: 0.1)
-        XCTAssertEqual(rendered?.1.width ?? 0, 140.4, accuracy: 0.1)
-        XCTAssertEqual(rendered?.1.height ?? 0, 140.4, accuracy: 0.1)
+        XCTAssertEqual(rendered?.1.minX ?? 0, point.x - 105.3, accuracy: 0.1)
+        XCTAssertEqual(rendered?.1.minY ?? 0, point.y - 105.3, accuracy: 0.1)
+        XCTAssertEqual(rendered?.1.width ?? 0, 210.6, accuracy: 0.1)
+        XCTAssertEqual(rendered?.1.height ?? 0, 210.6, accuracy: 0.1)
         XCTAssertTrue(rendered?.1.contains(point) ?? false)
     }
 }
