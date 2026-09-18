@@ -807,6 +807,63 @@ def generate():
         ) * math.exp(-time * 2.2)
     write_wav("animal_burn_death", normalize(animal_burn_death, 0.8))
 
+    # Poop sounds use a private RNG so adding them cannot alter earlier WAVs.
+    poop_rng = random.Random(20260920)
+    flight_duration = 0.78
+    poop_flight = []
+    flight_noise_state = 0.0
+    for index in range(seconds(flight_duration)):
+        time = index / SAMPLE_RATE
+        progress = time / flight_duration
+        raw = poop_rng.uniform(-1, 1)
+        filter_strength = 4.8 + 7.5 * math.sin(math.pi * progress)
+        flight_noise_state += (raw - flight_noise_state) / filter_strength
+        whistle_frequency = 520 + 410 * math.sin(math.pi * min(1, progress * 1.04))
+        whistle = math.sin(2 * math.pi * whistle_frequency * time)
+        flutter = 0.76 + 0.24 * math.sin(2 * math.pi * 9.5 * time)
+        attack = min(1.0, time / 0.055)
+        release = min(1.0, max(0.0, (flight_duration - time) / 0.10))
+        poop_flight.append(
+            (flight_noise_state * 0.78 + whistle * 0.16)
+            * flutter
+            * attack
+            * release
+            * math.sin(math.pi * min(1, progress * 1.08))
+        )
+    poop_flight = lowpass(poop_flight, 1.1)
+    write_wav("poop_flight", normalize(poop_flight, 0.68))
+
+    splat_duration = 0.30
+    poop_splat = []
+    splat_state = 0.0
+    splat_dark_state = 0.0
+    for index in range(seconds(splat_duration)):
+        time = index / SAMPLE_RATE
+        raw = poop_rng.uniform(-1, 1)
+        splat_state += (raw - splat_state) / (1.4 + 38.0 * math.exp(-time * 62.0))
+        dark_raw = poop_rng.uniform(-1, 1)
+        splat_dark_state += (dark_raw - splat_dark_state) / 8.0
+        slap = splat_state * math.exp(-time * 42.0)
+        wet_body = math.sin(2 * math.pi * (122 - 62 * time) * time) * math.exp(-time * 24.0)
+        splatter = splat_dark_state * 0.42 * math.exp(-time * 15.0)
+        crackle = 0.0
+        if poop_rng.random() < (46.0 * math.exp(-time * 22.0)) / SAMPLE_RATE:
+            crackle = poop_rng.uniform(-0.42, 0.42)
+        poop_splat.append((slap * 1.32 + wet_body * 0.62 + splatter + crackle) * min(1.0, time / 0.004))
+    poop_splat = mix(
+        scaled(external["impact_punch_medium"], 0.45),
+        segment(external["slime"], 0.0, splat_duration),
+        poop_splat,
+        master=0.78,
+    )
+    poop_splat = dry_impact(
+        poop_splat,
+        duration=splat_duration,
+        decay=11.5,
+        release=0.030,
+    )
+    write_wav("poop_splat", normalize(poop_splat, 0.86))
+
 
 if __name__ == "__main__":
     generate()

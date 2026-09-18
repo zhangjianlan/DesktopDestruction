@@ -52,6 +52,8 @@ final class AudioManager {
                 "water_spray",
                 "saw_loop",
                 "saw_cut_hit",
+                "poop_flight",
+                "poop_splat",
                 "nuke_alarm",
                 "nuke_detonation"
             ] {

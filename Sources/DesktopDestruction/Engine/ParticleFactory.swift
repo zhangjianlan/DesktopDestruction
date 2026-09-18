@@ -161,6 +161,46 @@ enum ParticleFactory {
         canvas.removeAfter(emitter, delay: 0.52)
     }
 
+    static func poopSpray(at point: CGPoint, count: Int, in canvas: DestructionCanvas) {
+        let scaledCount = max(8, Int(CGFloat(count) * multiplier))
+        let emitter = burstEmitter(at: point, life: 0.55)
+        emitter.zPosition = 97
+
+        let droplets = CAEmitterCell()
+        droplets.contents = ArtAssets.image(named: "effect-water-drop")
+        droplets.scale = CGFloat(0.065)
+        droplets.scaleRange = CGFloat(0.026)
+        droplets.birthRate = Float(scaledCount)
+        droplets.lifetime = 0.36
+        droplets.lifetimeRange = 0.14
+        droplets.velocity = 335
+        droplets.velocityRange = 145
+        droplets.emissionRange = 2 * .pi
+        droplets.yAcceleration = -900
+        droplets.color = CGColor(red: 0.38, green: 0.21, blue: 0.06, alpha: 1)
+        droplets.alphaSpeed = -2.3
+
+        let chunks = CAEmitterCell()
+        chunks.contents = ArtAssets.image(named: "effect-debris")
+        chunks.scale = CGFloat(0.085)
+        chunks.scaleRange = CGFloat(0.035)
+        chunks.birthRate = Float(max(5, Int(Double(scaledCount) * 0.38)))
+        chunks.lifetime = 0.45
+        chunks.lifetimeRange = 0.16
+        chunks.velocity = 255
+        chunks.velocityRange = 115
+        chunks.emissionRange = 2 * .pi
+        chunks.yAcceleration = -780
+        chunks.spin = CGFloat.random(in: -10...10)
+        chunks.spinRange = 6
+        chunks.color = CGColor(red: 0.34, green: 0.18, blue: 0.05, alpha: 1)
+        chunks.alphaSpeed = -1.8
+
+        emitter.emitterCells = [droplets, chunks]
+        canvas.addTransient(emitter)
+        canvas.removeAfter(emitter, delay: 0.6)
+    }
+
     static func waterStream(at point: CGPoint, direction: CGPoint, in canvas: DestructionCanvas) -> CAEmitterLayer {
         let emitter = streamEmitter(at: point)
         let stream = CAEmitterCell()

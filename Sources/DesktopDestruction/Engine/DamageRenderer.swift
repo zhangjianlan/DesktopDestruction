@@ -426,6 +426,64 @@ enum DamageRenderer {
         return image.map { ($0, frame) }
     }
 
+    static func renderPoopSplat(at point: CGPoint, radius: CGFloat = 26) -> (CGImage, CGRect)? {
+        let frame = frame(at: point, radius: radius * 1.95)
+        let image = cachedImage("poop", radius: radius, variants: 8, frameSize: frame.size) { context, center in
+            drawRadial(
+                in: context,
+                at: center,
+                radius: radius * 1.05,
+                colors: [
+                    rgba(0.46, 0.27, 0.10, 0.95),
+                    rgba(0.32, 0.17, 0.06, 0.72),
+                    rgba(0.14, 0.08, 0.02, 0)
+                ]
+            )
+
+            context.setFillColor(rgba(0.54, 0.34, 0.13, 0.72))
+            context.fillEllipse(in: ellipse(
+                center: center,
+                radiusX: radius * 0.62,
+                radiusY: radius * 0.42
+            ))
+
+            for _ in 0..<12 {
+                let angle = CGFloat.random(in: 0...(2 * .pi))
+                let distance = radius * CGFloat.random(in: 0.38...1.72)
+                let dropRadius = CGFloat.random(in: 1.5...5.6)
+                let drop = CGPoint(x: center.x + cos(angle) * distance, y: center.y + sin(angle) * distance)
+                context.setFillColor(rgba(
+                    0.38,
+                    0.21,
+                    0.07,
+                    CGFloat.random(in: 0.68...0.94)
+                ))
+                context.fillEllipse(in: ellipse(
+                    center: drop,
+                    radiusX: dropRadius * CGFloat.random(in: 0.7...1.5),
+                    radiusY: dropRadius
+                ))
+            }
+
+            for _ in 0..<5 {
+                let angle = CGFloat.random(in: 0...(2 * .pi))
+                let length = radius * CGFloat.random(in: 0.65...1.55)
+                let width = CGFloat.random(in: 1.6...4.4)
+                context.setStrokeColor(rgba(0.35, 0.19, 0.06, 0.82))
+                context.setLineWidth(width)
+                context.setLineCap(.round)
+                context.move(to: center)
+                context.addLine(to: CGPoint(
+                    x: center.x + cos(angle) * length,
+                    y: center.y + sin(angle) * length * 0.75
+                ))
+                context.strokePath()
+            }
+        }
+
+        return image.map { ($0, frame) }
+    }
+
     static func renderSlimeTrail(at point: CGPoint) -> (CGImage, CGRect)? {
         let radius: CGFloat = 8
         let frame = frame(at: point, radius: radius * 1.5)

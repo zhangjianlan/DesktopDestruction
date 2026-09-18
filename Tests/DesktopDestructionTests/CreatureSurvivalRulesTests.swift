@@ -8,6 +8,8 @@ final class CreatureSurvivalRulesTests: XCTestCase {
         XCTAssertEqual(Tool.saw.creatureDamage, 8)
         XCTAssertEqual(Tool.fist.creatureDamage, 24)
         XCTAssertEqual(Tool.bomb.creatureDamage, 1000)
+        XCTAssertEqual(Tool.poop.rawValue, 16)
+        XCTAssertEqual(Tool.poop.creatureDamage, 0)
 
         let tierOne = CreatureActor(at: .zero, kind: .person(.zombie))
         XCTAssertTrue(tierOne.applyDamage(Tool.hammer.creatureDamage, from: .zero))

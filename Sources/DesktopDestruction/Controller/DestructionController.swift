@@ -204,6 +204,8 @@ final class DestructionController {
             placeAnything(at: point)
         case .wall:
             placeWall(at: point)
+        case .poop:
+            throwPoop(to: point)
         }
     }
 
@@ -739,6 +741,90 @@ final class DestructionController {
             fist.add(fade, forKey: "fistFade")
         }
         canvas.removeAfter(fist, delay: 0.38)
+    }
+
+    private func throwPoop(to target: CGPoint) {
+        let bounds = view.bounds
+        let startsFromLeft = target.x >= bounds.midX
+        let start = CGPoint(
+            x: startsFromLeft ? bounds.minX + 36 : bounds.maxX - 36,
+            y: bounds.maxY + 42
+        )
+        let distance = hypot(target.x - start.x, target.y - start.y)
+        let diagonal = max(1, hypot(bounds.width, bounds.height))
+        let duration = 0.64 + CGFloat(0.30) * min(1, distance / diagonal)
+        let arcHeight = min(260, max(105, distance * 0.34))
+        let control = CGPoint(
+            x: (start.x + target.x) / 2,
+            y: min(start.y, target.y) - arcHeight
+        )
+
+        let path = CGMutablePath()
+        path.move(to: start)
+        path.addQuadCurve(to: target, control: control)
+
+        let poop = CALayer()
+        poop.contents = ArtAssets.openMoji("💩") ?? IconRenderer.emoji("💩", size: 64)
+        poop.contentsGravity = .resizeAspect
+        poop.contentsScale = 2
+        poop.bounds = CGRect(x: 0, y: 0, width: 62, height: 62)
+        poop.position = target
+        poop.zPosition = 78
+        canvas.addTransient(poop)
+
+        let flight = CAKeyframeAnimation(keyPath: "position")
+        flight.path = path
+        flight.duration = duration
+        flight.timingFunction = CAMediaTimingFunction(name: .linear)
+        poop.add(flight, forKey: "poopFlight")
+
+        let spin = CAKeyframeAnimation(keyPath: "transform.rotation.z")
+        spin.values = [0, CGFloat.pi * 2]
+        spin.duration = duration
+        spin.timingFunction = CAMediaTimingFunction(name: .linear)
+        poop.add(spin, forKey: "poopSpin")
+
+        let travelScale = CAKeyframeAnimation(keyPath: "transform.scale")
+        travelScale.values = [0.72, 1.16, 0.98]
+        travelScale.keyTimes = [0, 0.58, 1]
+        travelScale.timingFunctions = [
+            CAMediaTimingFunction(name: .easeOut),
+            CAMediaTimingFunction(name: .easeInEaseOut)
+        ]
+        travelScale.duration = duration
+        poop.add(travelScale, forKey: "poopTravelScale")
+
+        AudioManager.shared.play(
+            "poop_flight",
+            gain: 0.78,
+            rate: Float(0.78 / duration),
+            minimumInterval: 0.08
+        )
+
+        after(duration) { [weak self] in
+            guard let self else { return }
+            poop.removeAnimation(forKey: "poopFlight")
+
+            let squashX = CABasicAnimation(keyPath: "transform.scale.x")
+            squashX.fromValue = 1.36
+            squashX.toValue = 1
+            squashX.duration = 0.14
+            poop.add(squashX, forKey: "poopSquashX")
+
+            let squashY = CABasicAnimation(keyPath: "transform.scale.y")
+            squashY.fromValue = 0.62
+            squashY.toValue = 1
+            squashY.duration = 0.14
+            poop.add(squashY, forKey: "poopSquashY")
+
+            if let splat = DamageRenderer.renderPoopSplat(at: target, radius: 36) {
+                self.canvas.addDamage(image: splat.0, frame: splat.1, permanent: true)
+            }
+            ParticleFactory.poopSpray(at: target, count: 34, in: self.canvas)
+            AudioManager.shared.play("poop_splat", gain: 1, minimumInterval: 0.03)
+            ScreenShake.shake(self.canvas.root, intensity: 5, duration: 0.13)
+        }
+        canvas.removeAfter(poop, delay: duration + 0.24)
     }
 
     private func eraseAt(_ point: CGPoint) {

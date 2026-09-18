@@ -14,7 +14,9 @@ final class AudioResourceTests: XCTestCase {
             "water_spray",
             "flame_loop",
             "saw_loop",
-            "saw_cut_hit"
+            "saw_cut_hit",
+            "poop_flight",
+            "poop_splat"
         ]
 
         for name in names {

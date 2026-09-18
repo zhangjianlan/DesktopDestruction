@@ -16,6 +16,7 @@ enum Tool: Int, CaseIterable {
     case animal = 13
     case anything = 14
     case wall = 15
+    case poop = 16
 
     var name: String {
         switch self {
@@ -34,6 +35,7 @@ enum Tool: Int, CaseIterable {
         case .animal: return "放动物"
         case .anything: return "任意 emoji"
         case .wall: return "放围墙"
+        case .poop: return "丢💩"
         }
     }
 
@@ -54,6 +56,7 @@ enum Tool: Int, CaseIterable {
         case .animal: return "🐾"
         case .anything: return "🎲"
         case .wall: return "🧱"
+        case .poop: return "💩"
         }
     }
 
@@ -74,6 +77,7 @@ enum Tool: Int, CaseIterable {
         case .animal: return "tool-animal"
         case .anything: return "tool-anything"
         case .wall: return "tool-wall"
+        case .poop: return "tool-poop"
         }
     }
 
