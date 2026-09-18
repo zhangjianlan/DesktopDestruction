@@ -322,8 +322,8 @@ final class DestructionController {
         NSLog("[DesktopDestruction] cracks added count=2")
         ParticleFactory.sparks(at: point, count: 34, in: canvas)
         ParticleFactory.glassShards(at: point, count: 28, in: canvas)
-        let soundAccepted = AudioManager.shared.play("hammer_hit", gain: 1, rate: 1.12)
-        AudioManager.shared.play("glass_shatter", gain: 0.68, rate: 1.02)
+        let soundAccepted = AudioManager.shared.play("hammer_hit", gain: 1, rate: 1.0)
+        AudioManager.shared.play("glass_shatter", gain: 0.46, rate: 1.04)
         NSLog("[DesktopDestruction] hammer sound accepted=%d", soundAccepted ? 1 : 0)
         let shakeAccepted = ScreenShake.shake(canvas.root, intensity: 13, duration: 0.2)
         NSLog("[DesktopDestruction] shake requested accepted=%d", shakeAccepted ? 1 : 0)
@@ -1067,7 +1067,7 @@ final class DestructionController {
         canvas.addTransient(wall.layer)
         walls.append(wall)
         ParticleFactory.dust(at: point, count: 10, in: canvas)
-        AudioManager.shared.play("hammer_hit", gain: 0.45, rate: 0.75)
+        AudioManager.shared.play("hammer_hit", gain: 0.45, rate: 1.0)
         ensureSimulation()
     }
 

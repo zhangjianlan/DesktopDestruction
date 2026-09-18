@@ -333,25 +333,11 @@ def generate():
     rng = random.Random(20260915)
     external = load_external_samples()
 
-    hammer_body = []
-    for index in range(seconds(0.34)):
-        time = index / SAMPLE_RATE
-        impact = math.exp(-time * 25)
-        body = math.sin(2 * math.pi * 73 * time) * 0.62
-        slap = math.sin(2 * math.pi * 225 * time) * 0.22
-        hammer_body.append((body + slap) * impact)
-    hammer_ring = []
-    for index in range(seconds(0.34)):
-        time = index / SAMPLE_RATE
-        hammer_ring.append(
-            math.sin(2 * math.pi * 415 * time)
-            * math.exp(-time * 12)
-            * 0.18
-        )
+    # A mining impact has the natural transient, debris, and room tail that a
+    # synthesized hammer body lacks. Wood adds weight without masking the hit.
     hammer = mix(
-        scaled(external["impact_metal_heavy"], 0.95),
-        hammer_body,
-        delayed(hammer_ring, 0.012),
+        scaled(external["impact_mining"], 1.0),
+        scaled(external["impact_wood_heavy"], 0.38),
         master=0.92,
     )
     write_wav("hammer_hit", normalize(hammer, 0.90))
