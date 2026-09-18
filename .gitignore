@@ -6,3 +6,5 @@ work/
 *.pid
 DerivedData/
 Package.resolved
+.cache/
+__pycache__/

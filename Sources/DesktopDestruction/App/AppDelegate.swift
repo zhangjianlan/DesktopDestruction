@@ -55,6 +55,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let coordinator = OverlayCoordinator(window: window, background: background)
             self.coordinator = coordinator
             coordinator.start()
+            AudioManager.shared.preloadCommonSounds()
             PipelineLog.info("overlay start confirmed")
         }
     }

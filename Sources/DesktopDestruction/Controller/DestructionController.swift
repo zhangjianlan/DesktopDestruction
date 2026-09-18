@@ -303,8 +303,8 @@ final class DestructionController {
         NSLog("[DesktopDestruction] cracks added count=2")
         ParticleFactory.sparks(at: point, count: 34, in: canvas)
         ParticleFactory.glassShards(at: point, count: 28, in: canvas)
-        let soundAccepted = AudioManager.shared.play("hammer_hit", gain: 1, rate: 1.25)
-        AudioManager.shared.play("glass_shatter", gain: 0.75, rate: 1.05)
+        let soundAccepted = AudioManager.shared.play("hammer_hit", gain: 1, rate: 1.12)
+        AudioManager.shared.play("glass_shatter", gain: 0.68, rate: 1.02)
         NSLog("[DesktopDestruction] hammer sound accepted=%d", soundAccepted ? 1 : 0)
         let shakeAccepted = ScreenShake.shake(canvas.root, intensity: 13, duration: 0.2)
         NSLog("[DesktopDestruction] shake requested accepted=%d", shakeAccepted ? 1 : 0)
@@ -337,8 +337,8 @@ final class DestructionController {
         ParticleFactory.muzzleFlash(at: point, in: canvas)
         AudioManager.shared.play(
             "gun_0\(Int.random(in: 1...4))",
-            gain: 0.9,
-            rate: Float.random(in: 0.92...1.08)
+            gain: 0.76,
+            rate: Float.random(in: 0.88...1.04)
         )
         ScreenShake.shake(canvas.root, intensity: 3.2, duration: 0.07)
     }
@@ -373,7 +373,7 @@ final class DestructionController {
     private func startSaw(at point: CGPoint) {
         lastSawPoint = point
         sawStepCount = 0
-        AudioManager.shared.startLoop("saw_loop")
+        AudioManager.shared.startLoop("saw_loop", gain: 0.74)
         updateStream(.saw, at: point, direction: CGPoint(x: 1, y: 0))
     }
 
@@ -407,7 +407,7 @@ final class DestructionController {
 
     private func startWater(at point: CGPoint) {
         updateStream(.water, at: point, direction: CGPoint(x: 0, y: 1))
-        AudioManager.shared.startLoop("water_spray")
+        AudioManager.shared.startLoop("water_spray", gain: 0.66)
         startRepeatingTimer(interval: 0.06) { [weak self] in
             guard let self, self.toolManager.current == .water else { return }
             self.addWetSpot(at: self.currentCursorPoint, radius: 38)
@@ -418,7 +418,7 @@ final class DestructionController {
 
     private func startFlame(at point: CGPoint) {
         updateStream(.flame, at: point, direction: CGPoint(x: 0, y: 1))
-        AudioManager.shared.startLoop("flame_loop")
+        AudioManager.shared.startLoop("flame_loop", gain: 0.82)
         startRepeatingTimer(interval: 0.13) { [weak self] in
             guard let self, self.toolManager.current == .flame else { return }
             self.addScorch(at: self.currentCursorPoint, radius: 12)
@@ -669,8 +669,8 @@ final class DestructionController {
         ParticleFactory.sparks(at: point, count: 56, in: canvas)
         ParticleFactory.smoke(at: point, count: 42, in: canvas)
         ParticleFactory.glassShards(at: point, count: 18, in: canvas)
-        AudioManager.shared.play("explosion", gain: 1, rate: 0.78)
-        AudioManager.shared.play("gun_04", gain: 0.42, rate: 0.48)
+        AudioManager.shared.play("explosion", gain: 1, rate: 0.72)
+        AudioManager.shared.play("glass_shatter", gain: 0.24, rate: 0.68)
         ScreenShake.shake(canvas.root, intensity: 30, duration: 0.58)
 
         after(0.34) { [weak self] in
@@ -685,7 +685,7 @@ final class DestructionController {
             self.damageWalls(at: point, radius: radius * 0.9, amount: 100)
             ParticleFactory.smoke(at: point, count: 24, in: self.canvas)
             ParticleFactory.dust(at: point, count: 30, in: self.canvas)
-            AudioManager.shared.play("explosion", gain: 0.62, rate: 0.55)
+            AudioManager.shared.play("explosion", gain: 0.58, rate: 0.46)
             ScreenShake.shake(self.canvas.root, intensity: 16, duration: 0.34)
         }
     }
@@ -1040,10 +1040,10 @@ final class DestructionController {
         )
         ParticleFactory.creatureHit(at: impactPoint, isVehicle: isVehicle, in: canvas)
         AudioManager.shared.play(
-            "punch_hit",
-            gain: isVehicle ? 0.18 : 0.14,
-            rate: isVehicle ? 1.48 : 1.72,
-            minimumInterval: 0.09
+            isVehicle ? "metal_hit" : "creature_hit",
+            gain: isVehicle ? 0.42 : 0.34,
+            rate: isVehicle ? 1.08 : 1.16,
+            minimumInterval: 0.05
         )
     }
 
@@ -1110,12 +1110,6 @@ final class DestructionController {
             let position = vehicle.currentPosition
             showCreatureHitFeedback(for: vehicle, at: point)
             ParticleFactory.smoke(at: position, count: 6, in: canvas)
-            AudioManager.shared.play(
-                "hammer_hit",
-                gain: 0.26,
-                rate: 0.72,
-                minimumInterval: 0.06
-            )
             return 0
         }
         return explodeVehicle(vehicle)
@@ -1226,11 +1220,11 @@ final class DestructionController {
         ParticleFactory.glassShards(at: point, count: 20, in: canvas)
         igniteFire(at: point, intensity: 1.4, force: true)
         AudioManager.shared.play(
-            "explosion",
-            gain: 0.94,
-            rate: Float.random(in: 1.04...1.24)
+            "vehicle_explosion",
+            gain: 0.98,
+            rate: Float.random(in: 0.96...1.10)
         )
-        AudioManager.shared.play("glass_shatter", gain: 0.42, rate: 1.18)
+        AudioManager.shared.play("glass_shatter", gain: 0.36, rate: 1.08)
         ScreenShake.shake(canvas.root, intensity: 21, duration: 0.35)
     }
 

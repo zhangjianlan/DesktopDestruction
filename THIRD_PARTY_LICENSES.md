@@ -14,6 +14,27 @@
 - License: Creative Commons Zero (CC0)
 - Use: fire, smoke, spark, muzzle flash, and debris particle sprites.
 
+## Kenney Impact Sounds
+
+- Project: https://kenney.nl/assets/impact-sounds
+- License: Creative Commons Zero (CC0)
+- Local license: `THIRD_PARTY_LICENSES/Kenney-Impact-Sounds-License.txt`
+- Use: physical impact layers for hammers, bullets, punches, glass, creatures, and vehicles.
+
+## Kenney Sci-Fi Sounds
+
+- Project: https://kenney.nl/assets/sci-fi-sounds
+- License: Creative Commons Zero (CC0)
+- Local license: `THIRD_PARTY_LICENSES/Kenney-Sci-Fi-Sounds-License.txt`
+- Use: explosion, rocket, flame, and liquid layers.
+
+## Kenney Interface Sounds
+
+- Project: https://kenney.nl/assets/interface-sounds
+- License: Creative Commons Zero (CC0)
+- Local license: `THIRD_PARTY_LICENSES/Kenney-Interface-Sounds-License.txt`
+- Use: interface clicks and bomb countdown ticks.
+
 ## OpenGameArt Explosion
 
 - Project: https://opengameart.org/content/explosion

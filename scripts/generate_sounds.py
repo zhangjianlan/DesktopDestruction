@@ -5,6 +5,9 @@ import random
 import struct
 import wave
 
+from fetch_external_sounds import ensure_external_samples
+
+
 SAMPLE_RATE = 44100
 OUTPUT_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -71,6 +74,63 @@ def mix(*layers, master=1.0):
     return output
 
 
+def read_wav(path):
+    with wave.open(str(path), "rb") as source:
+        if source.getsampwidth() != 2:
+            raise ValueError(f"external sample must be 16-bit PCM: {path}")
+        count = source.getnframes()
+        frames = source.readframes(count)
+        return list(struct.unpack(f"<{count}h", frames))
+
+
+def scaled(samples, gain):
+    return [sample * gain / 32768.0 for sample in samples]
+
+
+def delayed(samples, delay):
+    return [0.0] * seconds(delay) + samples
+
+
+def fit(samples, duration):
+    target = seconds(duration)
+    if len(samples) >= target:
+        return samples[:target]
+    return samples + [0.0] * (target - len(samples))
+
+
+def segment(samples, start, duration):
+    start_index = seconds(start)
+    end_index = start_index + seconds(duration)
+    if start_index >= len(samples):
+        return [0.0] * seconds(duration)
+    return fit(samples[start_index:end_index], duration)
+
+
+def tile(samples, repetitions, crossfade=0.035):
+    if repetitions <= 1:
+        return list(samples)
+    output = list(samples)
+    fade_count = min(len(output), seconds(crossfade))
+    for _ in range(repetitions - 1):
+        chunk = list(samples)
+        if fade_count and len(output) >= fade_count:
+            for index in range(fade_count):
+                weight = index / fade_count
+                output[-fade_count + index] = (
+                    output[-fade_count + index] * (1.0 - weight)
+                    + chunk[index] * weight
+                )
+            output.extend(chunk[fade_count:])
+        else:
+            output.extend(chunk)
+    return output
+
+
+def load_external_samples():
+    paths = ensure_external_samples()
+    return {name: scaled(read_wav(path), 1.0) for name, path in paths.items()}
+
+
 def generate_human_scream(
     rng,
     duration,
@@ -82,6 +142,7 @@ def generate_human_scream(
 ):
     source = []
     phase = 0.0
+    jitter = 0.0
     for index in range(seconds(duration)):
         time = index / SAMPLE_RATE
         progress = time / duration
@@ -90,7 +151,8 @@ def generate_human_scream(
             progress * 1.22,
         )
         frequency += math.sin(2 * math.pi * 6.5 * time) * 3.2 * tension
-        frequency += (rng.random() - 0.5) * 3.8 * tension
+        jitter += ((rng.random() - 0.5) * 9.0 * tension - jitter) * 0.10
+        frequency += jitter
         phase += frequency / SAMPLE_RATE
         if phase >= 1.0:
             phase -= math.floor(phase)
@@ -100,7 +162,11 @@ def generate_human_scream(
             + 0.20 * math.sin(6 * math.pi * phase)
             + 0.11 * math.sin(8 * math.pi * phase)
         )
-        envelope = min(1.0, time / 0.028) * math.exp(-time * (2.7 + tension * 1.5))
+        envelope = (
+            min(1.0, time / (0.020 + 0.010 * tension))
+            * (0.94 + 0.06 * math.sin(2 * math.pi * 8.5 * time))
+            * math.exp(-time * (2.4 + tension * 1.35))
+        )
         source.append(math.tanh(pulse * (1.2 + tension * 0.5)) * envelope)
 
     voiced = mix(
@@ -110,13 +176,18 @@ def generate_human_scream(
         ],
         master=0.68,
     )
-    breath = lowpass([rng.uniform(-1, 1) for _ in range(len(source))], 2)
+    breath = lowpass([rng.uniform(-1, 1) for _ in range(len(source))], 3)
+    throat = lowpass([rng.uniform(-1, 1) for _ in range(len(source))], 12)
     output = []
-    for index, (voice, air) in enumerate(zip(voiced, breath)):
+    for index, (voice, air, roughness) in enumerate(zip(voiced, breath, throat)):
         time = index / SAMPLE_RATE
-        tail = math.exp(-time * 8.0) * (1.0 - min(1.0, time / duration))
+        tail = math.exp(-time * 6.5) * (1.0 - min(1.0, time / duration))
         shout = voice * (1.0 + 0.22 * math.tanh(voice * 2.0))
-        output.append(shout + air * breath_amount * tail)
+        output.append(
+            shout
+            + air * breath_amount * tail
+            + roughness * 0.055 * tension * tail
+        )
     return output
 
 
@@ -130,13 +201,16 @@ def generate_zombie_voice(
 ):
     source = []
     phase = 0.0
+    jitter = 0.0
     for index in range(seconds(duration)):
         time = index / SAMPLE_RATE
         progress = time / duration
         shape = math.sin(math.pi * min(1.0, progress * 1.12))
         frequency = start_frequency + (end_frequency - start_frequency) * shape
-        frequency += math.sin(2 * math.pi * 11.0 * time) * 2.8
-        frequency += math.sin(2 * math.pi * 3.1 * time) * 3.6
+        frequency += math.sin(2 * math.pi * 9.5 * time) * (2.2 + growl_strength)
+        frequency += math.sin(2 * math.pi * 3.1 * time) * (2.7 + growl_strength)
+        jitter += ((rng.random() - 0.5) * 8.0 * growl_strength - jitter) * 0.08
+        frequency += jitter
         phase += frequency / SAMPLE_RATE
         if phase >= 1.0:
             phase -= math.floor(phase)
@@ -146,7 +220,7 @@ def generate_zombie_voice(
             + 0.30 * math.sin(6 * math.pi * phase)
             + 0.18 * math.sin(8 * math.pi * phase)
         )
-        envelope = min(1.0, time / 0.06) * shape
+        envelope = min(1.0, time / (0.045 + 0.015 * growl_strength)) * shape
         source.append(math.tanh(pulse * (1.1 + growl_strength * 0.5)) * envelope)
 
     formants = [
@@ -158,15 +232,75 @@ def generate_zombie_voice(
         *[resonator(source, frequency, bandwidth, gain) for frequency, bandwidth, gain in formants],
         master=0.72,
     )
-    growl = lowpass([rng.uniform(-1, 1) for _ in range(len(source))], 6)
+    growl = lowpass([rng.uniform(-1, 1) for _ in range(len(source))], 5)
+    wet = lowpass([rng.uniform(-1, 1) for _ in range(len(source))], 15)
     output = []
-    for index, (voice, roughness) in enumerate(zip(voiced, growl)):
+    for index, (voice, roughness, moisture) in enumerate(
+        zip(voiced, growl, wet)
+    ):
         time = index / SAMPLE_RATE
-        envelope = min(1.0, time / 0.035) * math.exp(-time * (1.7 if roar else 2.7))
+        envelope = min(1.0, time / 0.035) * math.exp(
+            -time * ((1.1 if roar else 2.3) + 0.15 * growl_strength)
+        )
         output.append(
-            (voice + roughness * 0.28 * growl_strength)
+            (
+                voice
+                + roughness * (0.27 + 0.07 * growl_strength) * growl_strength
+                + moisture * 0.06 * growl_strength
+            )
             * envelope
-            * (0.82 + 0.18 * math.sin(2 * math.pi * 16.5 * time)),
+            * (0.82 + 0.18 * math.sin(2 * math.pi * (13.5 if roar else 17.5) * time)),
+        )
+    return output
+
+
+def generate_animal_voice(
+    rng,
+    duration,
+    start_frequency,
+    end_frequency,
+    formants,
+    distress=1.0,
+):
+    source = []
+    phase = 0.0
+    jitter = 0.0
+    for index in range(seconds(duration)):
+        time = index / SAMPLE_RATE
+        progress = time / duration
+        shape = math.sin(math.pi * min(1.0, progress * 1.08))
+        frequency = start_frequency + (end_frequency - start_frequency) * shape
+        frequency += math.sin(2 * math.pi * 8.0 * time) * 3.0 * distress
+        jitter += ((rng.random() - 0.5) * 8.0 * distress - jitter) * 0.09
+        frequency += jitter
+        phase += frequency / SAMPLE_RATE
+        if phase >= 1.0:
+            phase -= math.floor(phase)
+        pulse = (
+            math.sin(2 * math.pi * phase)
+            + 0.44 * math.sin(4 * math.pi * phase)
+            + 0.24 * math.sin(6 * math.pi * phase)
+            + 0.12 * math.sin(8 * math.pi * phase)
+        )
+        envelope = min(1.0, time / 0.028) * shape
+        source.append(math.tanh(pulse * 1.35) * envelope)
+
+    voiced = mix(
+        *[
+            resonator(source, frequency, bandwidth, gain)
+            for frequency, bandwidth, gain in formants
+        ],
+        master=0.68,
+    )
+    roughness = lowpass([rng.uniform(-1, 1) for _ in range(len(source))], 6)
+    output = []
+    for voice, rough in zip(voiced, roughness):
+        time = len(output) / SAMPLE_RATE
+        envelope = min(1.0, time / 0.028) * math.exp(-time * 2.7)
+        output.append(
+            (voice + rough * 0.16 * distress)
+            * envelope
+            * (0.88 + 0.12 * math.sin(2 * math.pi * 14.0 * time))
         )
     return output
 
@@ -197,34 +331,101 @@ def loopify(samples, fade_ms=20):
 
 def generate():
     rng = random.Random(20260915)
+    external = load_external_samples()
 
-    hammer = []
-    for index in range(seconds(0.28)):
+    hammer_body = []
+    for index in range(seconds(0.34)):
         time = index / SAMPLE_RATE
-        impact = math.exp(-time * 32)
-        body = math.sin(2 * math.pi * 118 * time) * 0.45
-        click = math.exp(-time * 180) * math.sin(2 * math.pi * 1700 * time) * 0.35
-        hammer.append((body + click + lowpass([rng.uniform(-1, 1)], 1.5)[-1] * impact) * impact)
-    write_wav("hammer_hit", normalize(hammer))
+        impact = math.exp(-time * 25)
+        body = math.sin(2 * math.pi * 73 * time) * 0.62
+        slap = math.sin(2 * math.pi * 225 * time) * 0.22
+        hammer_body.append((body + slap) * impact)
+    hammer_ring = []
+    for index in range(seconds(0.34)):
+        time = index / SAMPLE_RATE
+        hammer_ring.append(
+            math.sin(2 * math.pi * 415 * time)
+            * math.exp(-time * 12)
+            * 0.18
+        )
+    hammer = mix(
+        scaled(external["impact_metal_heavy"], 0.95),
+        hammer_body,
+        delayed(hammer_ring, 0.012),
+        master=0.92,
+    )
+    write_wav("hammer_hit", normalize(hammer, 0.90))
+
+    glass_tail = []
+    glass_noise_state = 0.0
+    for index in range(seconds(0.68)):
+        time = index / SAMPLE_RATE
+        raw = rng.uniform(-1, 1)
+        glass_noise_state += (raw - glass_noise_state) / 2.0
+        if rng.random() < (58.0 * math.exp(-time * 4.5)) / SAMPLE_RATE:
+            glass_noise_state += rng.uniform(-0.65, 0.65)
+        glass_tail.append(glass_noise_state * math.exp(-time * 3.4))
+    glass_tail = mix(
+        resonator(glass_tail, 1900, 320, 1.0),
+        resonator(glass_tail, 3100, 420, 0.62),
+        resonator(glass_tail, 5200, 560, 0.35),
+        master=0.70,
+    )
+    glass = mix(
+        scaled(external["impact_glass_heavy"], 1.0),
+        delayed(glass_tail, 0.015),
+        master=0.90,
+    )
+    write_wav("glass_shatter", normalize(glass, 0.88))
 
     for number in range(1, 5):
         shot = []
+        noise_state = 0.0
+        mechanical_state = 0.0
         seed = rng.uniform(0.9, 1.15)
-        for index in range(seconds(0.22)):
+        for index in range(seconds(0.20)):
             time = index / SAMPLE_RATE
-            envelope = math.exp(-time * 58)
-            noise = rng.uniform(-1, 1)
-            thump = math.sin(2 * math.pi * (140 * seed + index / SAMPLE_RATE * 45) * time)
-            shot.append((noise * 0.68 + thump * 0.42) * envelope)
-        write_wav(f"gun_0{number}", normalize(shot))
+            raw = rng.uniform(-1, 1)
+            noise_state += (raw - noise_state) / (1.8 + 9.0 * math.exp(-time * 24.0))
+            muzzle = noise_state * math.exp(-time * 42.0)
+            thump = math.sin(2 * math.pi * (74.0 * seed + time * 38.0) * time)
+            thump *= math.exp(-time * 28.0)
+            shot.append((muzzle * 1.15 + thump * 0.58))
+
+        mechanical = []
+        for index in range(seconds(0.09)):
+            time = index / SAMPLE_RATE
+            raw = rng.uniform(-1, 1)
+            mechanical_state += (raw - mechanical_state) / 4.0
+            mechanical.append(
+                mechanical_state
+                * (
+                    math.exp(-abs(time - 0.018) * 260.0)
+                    + 0.55 * math.exp(-abs(time - 0.055) * 220.0)
+                )
+            )
+        full_shot = mix(
+            scaled(external["impact_metal_light"], 0.48),
+            shot,
+            delayed(mechanical, 0.028),
+            master=0.88,
+        )
+        write_wav(f"gun_0{number}", normalize(full_shot, 0.88))
 
     saw = []
-    for index in range(seconds(0.5)):
+    motor_state = 0.0
+    for index in range(seconds(0.65)):
         time = index / SAMPLE_RATE
-        frequency = 62 + math.sin(2 * math.pi * 4 * time) * 4
-        value = sum(math.sin(2 * math.pi * frequency * harmonic * time) / harmonic for harmonic in range(1, 9))
-        saw.append(value * 0.24)
-    write_wav("saw_loop", normalize(loopify(saw)))
+        frequency = 58 + math.sin(2 * math.pi * 4 * time) * 4
+        value = sum(
+            math.sin(2 * math.pi * frequency * harmonic * time) / harmonic
+            for harmonic in range(1, 10)
+        )
+        raw = rng.uniform(-1, 1)
+        motor_state += (raw - motor_state) / 8.0
+        whine = math.sin(2 * math.pi * 1720 * time) * 0.055
+        saw.append(value * 0.20 + motor_state * 0.14 + whine)
+    write_wav("saw_loop", normalize(loopify(saw), 0.78))
 
     water = []
     source = [rng.uniform(-1, 1) for _ in range(seconds(1.05))]
@@ -233,40 +434,86 @@ def generate():
     for index, (bright, dark) in enumerate(zip(high, low)):
         time = index / SAMPLE_RATE
         amplitude = (0.72 + 0.28 * math.sin(2 * math.pi * 13 * time)) * math.sin(math.pi * time / 1.05)
-        water.append((bright - dark) * amplitude * 2.2)
-    write_wav("water_spray", normalize(water))
+        water.append((bright - dark) * amplitude * 1.8)
+    liquid = segment(tile(external["slime"], 3), 0.04, 1.05)
+    water = mix(water, liquid, master=0.78)
+    write_wav("water_spray", normalize(loopify(water, 35), 0.76))
 
     flame = []
     brown = 0.0
+    flame_external = segment(external["thruster_fire"], 0.55, 1.20)
     for index in range(seconds(1.2)):
         time = index / SAMPLE_RATE
         brown = (brown * 0.996 + rng.uniform(-1, 1) * 0.02)
         crackle = 0.0
-        if rng.random() < 14 / SAMPLE_RATE:
+        if rng.random() < 18 / SAMPLE_RATE:
             crackle = rng.uniform(-0.35, 0.35)
         flame.append((brown + crackle) * (0.85 + 0.15 * math.sin(2 * math.pi * 2.2 * time)))
-    write_wav("flame_loop", normalize(loopify(flame)))
+    flame = mix(flame_external, flame, master=0.72)
+    write_wav("flame_loop", normalize(loopify(flame, 45), 0.74))
 
     explosion = []
-    for index in range(seconds(1.15)):
+    explosion_body = []
+    rumble_state = 0.0
+    for index in range(seconds(1.75)):
         time = index / SAMPLE_RATE
-        boom = (math.sin(2 * math.pi * 50 * time) * 0.7 + math.sin(2 * math.pi * 88 * time) * 0.35)
-        noise = lowpass([rng.uniform(-1, 1) for _ in range(1)], 1.1)[-1]
-        value = (boom + noise * 0.8) * math.exp(-time * 3.2)
-        explosion.append(math.tanh(value * 1.5))
-    write_wav("explosion", normalize(explosion))
+        boom = (
+            math.sin(2 * math.pi * 47 * time) * 0.58
+            + math.sin(2 * math.pi * 82 * time) * 0.30
+        )
+        raw = rng.uniform(-1, 1)
+        rumble_state = rumble_state * 0.989 + raw * 0.037
+        value = (boom + rumble_state * 0.75) * math.exp(-time * 2.3)
+        explosion_body.append(math.tanh(value * 1.35))
+    explosion = mix(
+        scaled(external["explosion_crunch"], 1.0),
+        scaled(external["explosion_low"], 0.82),
+        explosion_body,
+        master=0.78,
+    )
+    write_wav("explosion", normalize(explosion, 0.90))
+
+    vehicle_debris = []
+    debris_state = 0.0
+    for index in range(seconds(1.9)):
+        time = index / SAMPLE_RATE
+        raw = rng.uniform(-1, 1)
+        debris_state += (raw - debris_state) / (3.0 + 18.0 * math.exp(-time * 3.0))
+        vehicle_debris.append(
+            debris_state
+            * math.exp(-time * 1.9)
+            * (0.85 + 0.15 * math.sin(2 * math.pi * 17.0 * time))
+        )
+    vehicle_explosion = mix(
+        scaled(external["explosion_crunch"], 1.0),
+        scaled(external["explosion_low"], 0.95),
+        scaled(external["impact_metal_heavy"], 0.55),
+        explosion_body,
+        delayed(vehicle_debris, 0.075),
+        master=0.74,
+    )
+    write_wav("vehicle_explosion", normalize(vehicle_explosion, 0.90))
 
     rocket = []
     previous = 0.0
-    for index in range(seconds(0.85)):
+    rocket_duration = 1.05
+    for index in range(seconds(rocket_duration)):
         time = index / SAMPLE_RATE
-        progress = time / 0.85
+        progress = time / rocket_duration
         strength = 2 + 24 * math.sin(math.pi * progress)
         noise = rng.uniform(-1, 1)
         previous += (noise - previous) / strength
-        tone = math.sin(2 * math.pi * (320 - 120 * progress) * time)
-        rocket.append((previous * 0.85 + tone * 0.24) * math.sin(math.pi * min(1, progress * 1.1)))
-    write_wav("rocket_launch", normalize(rocket))
+        tone = math.sin(2 * math.pi * (285 - 125 * progress) * time)
+        rocket.append(
+            (previous * 0.82 + tone * 0.22)
+            * math.sin(math.pi * min(1, progress * 1.08))
+        )
+    rocket = mix(
+        segment(external["thruster_fire"], 0.18, rocket_duration),
+        rocket,
+        master=0.74,
+    )
+    write_wav("rocket_launch", normalize(rocket, 0.88))
 
     nuke_alarm = []
     siren_phase = 0.0
@@ -333,21 +580,61 @@ def generate():
         attack = min(1.0, time / 0.006)
         release = min(1.0, max(0.0, (detonation_duration - time) / 0.58))
         nuke_detonation.append(math.tanh(value * 1.15) * attack * release)
+    nuke_detonation = mix(
+        scaled(external["explosion_crunch"], 0.52),
+        scaled(external["explosion_low"], 0.78),
+        nuke_detonation,
+        master=0.76,
+    )
     write_wav("nuke_detonation", normalize(nuke_detonation, 0.92))
 
     punch = []
-    for index in range(seconds(0.25)):
+    for index in range(seconds(0.32)):
         time = index / SAMPLE_RATE
-        value = math.sin(2 * math.pi * 82 * time) * math.exp(-time * 34)
-        value += rng.uniform(-1, 1) * math.exp(-time * 90) * 0.4
+        value = math.sin(2 * math.pi * 68 * time) * math.exp(-time * 24)
+        value += rng.uniform(-1, 1) * math.exp(-time * 82) * 0.34
         punch.append(value)
-    write_wav("punch_hit", normalize(punch))
+    punch = mix(
+        scaled(external["impact_punch_heavy"], 0.92),
+        punch,
+        master=0.86,
+    )
+    write_wav("punch_hit", normalize(punch, 0.90))
+
+    creature_hit = []
+    creature_state = 0.0
+    for index in range(seconds(0.24)):
+        time = index / SAMPLE_RATE
+        raw = rng.uniform(-1, 1)
+        creature_state += (raw - creature_state) / (2.0 + 8.0 * math.exp(-time * 32.0))
+        body = math.sin(2 * math.pi * 96 * time) * math.exp(-time * 31.0)
+        creature_hit.append((creature_state * 0.55 + body * 0.52) * math.exp(-time * 18.0))
+    creature_hit = mix(
+        scaled(external["impact_soft_medium"], 0.68),
+        creature_hit,
+        master=0.82,
+    )
+    write_wav("creature_hit", normalize(creature_hit, 0.82))
+
+    metal_hit = []
+    for index in range(seconds(0.34)):
+        time = index / SAMPLE_RATE
+        body = math.sin(2 * math.pi * 102 * time) * math.exp(-time * 23)
+        ring = math.sin(2 * math.pi * 620 * time) * math.exp(-time * 15) * 0.20
+        metal_hit.append(body + ring)
+    metal_hit = mix(
+        scaled(external["impact_metal_heavy"], 0.86),
+        metal_hit,
+        master=0.84,
+    )
+    write_wav("metal_hit", normalize(metal_hit, 0.86))
 
     tick = []
     for index in range(seconds(0.1)):
         time = index / SAMPLE_RATE
         tick.append(math.sin(2 * math.pi * 1150 * time) * math.exp(-time * 72))
-    write_wav("bomb_tick", normalize(tick, 0.55))
+    tick = mix(scaled(external["tick"], 0.72), tick, master=0.72)
+    write_wav("bomb_tick", normalize(tick, 0.58))
 
     swish = []
     source = [rng.uniform(-1, 1) for _ in range(seconds(0.22))]
@@ -362,13 +649,20 @@ def generate():
     for index in range(seconds(0.07)):
         time = index / SAMPLE_RATE
         click.append(math.sin(2 * math.pi * 1800 * time) * math.exp(-time * 130))
-    write_wav("switch_click", normalize(click, 0.5))
+    click = mix(scaled(external["switch"], 0.78), click, master=0.72)
+    write_wav("switch_click", normalize(click, 0.54))
 
     chime = []
     for index in range(seconds(0.7)):
         time = index / SAMPLE_RATE
-        frequency = 620 + (930 - 620) * min(1, time / 0.22)
-        chime.append(math.sin(2 * math.pi * frequency * time) * math.exp(-time * 4.2) * 0.7)
+        chime.append(
+            (
+                math.sin(2 * math.pi * 660 * time) * 0.58
+                + math.sin(2 * math.pi * 990 * time) * 0.32
+                + math.sin(2 * math.pi * 1320 * time) * 0.12
+            )
+            * math.exp(-time * 4.6)
+        )
     write_wav("restore_chime", normalize(chime, 0.7))
 
     person_death = generate_human_scream(
@@ -415,17 +709,14 @@ def generate():
     )
     write_wav("person_death_scream", normalize(person_death_scream, 0.80))
 
-    animal_death = []
-    for index in range(seconds(0.54)):
-        time = index / SAMPLE_RATE
-        progress = time / 0.54
-        frequency = 134 - 58 * progress + math.sin(2 * math.pi * 7.5 * time) * 3.5
-        voice = math.sin(2 * math.pi * frequency * time) * 0.58
-        voice += math.sin(2 * math.pi * frequency * 1.92 * time) * 0.2
-        voice += math.sin(2 * math.pi * frequency * 3.1 * time) * 0.08
-        growl = lowpass([rng.uniform(-1, 1)], 7)[-1] * 0.18
-        envelope = min(1, time / 0.025) * math.exp(-time * 3.5) * (1 - progress * 0.35)
-        animal_death.append((voice + growl) * envelope)
+    animal_death = generate_animal_voice(
+        rng,
+        duration=0.62,
+        start_frequency=148,
+        end_frequency=84,
+        formants=[(315, 125, 1.0), (900, 180, 0.38), (2050, 290, 0.12)],
+        distress=0.92,
+    )
     write_wav("animal_death", normalize(animal_death, 0.82))
 
     person_burn_death = generate_human_scream(
@@ -475,20 +766,25 @@ def generate():
     )
     write_wav("zombie_elite_roar", normalize(zombie_elite_roar, 0.88))
 
-    animal_burn_death = []
-    for index in range(seconds(0.56)):
+    animal_burn_death = generate_animal_voice(
+        rng,
+        duration=0.78,
+        start_frequency=252,
+        end_frequency=92,
+        formants=[(660, 145, 1.0), (1340, 220, 0.42), (2650, 300, 0.14)],
+        distress=1.24,
+    )
+    animal_burn_noise = lowpass(
+        [rng.uniform(-1, 1) for _ in range(len(animal_burn_death))], 5
+    )
+    for index in range(len(animal_burn_death)):
         time = index / SAMPLE_RATE
-        progress = time / 0.56
-        frequency = 252 - 126 * progress
-        voice = math.sin(2 * math.pi * frequency * time) * 0.55
-        voice += math.sin(2 * math.pi * frequency * 1.84 * time) * 0.19
-        voice += math.sin(2 * math.pi * frequency * 3.02 * time) * 0.07
-        distress = lowpass([rng.uniform(-1, 1)], 4)[-1] * 0.14
         crackle = 0.0
-        if rng.random() < 16 / SAMPLE_RATE:
+        if rng.random() < 22 / SAMPLE_RATE:
             crackle = rng.uniform(-0.22, 0.22)
-        envelope = min(1, time / 0.025) * math.exp(-time * 3.3)
-        animal_burn_death.append((voice + distress + crackle) * envelope)
+        animal_burn_death[index] += (
+            animal_burn_noise[index] * 0.13 + crackle
+        ) * math.exp(-time * 2.2)
     write_wav("animal_burn_death", normalize(animal_burn_death, 0.8))
 
 

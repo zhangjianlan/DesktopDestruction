@@ -66,6 +66,17 @@ python3 scripts/generate_art.py Sources/DesktopDestruction/Resources/Art
 
 生成脚本依赖 Python 3 和 Pillow。
 
+## 音效资源
+
+核心音效使用 Kenney CC0 采样与项目内合成层混合：锤击和玻璃有真实冲击层，机枪包含枪口爆压、机械回拉和低频后坐，爆炸包含低频轰鸣与碎片尾巴，生物、僵尸和动物有独立的受击与死亡反馈。生成脚本依赖 Python 3 与 `ffmpeg`：
+
+```bash
+python3 scripts/fetch_external_sounds.py
+python3 scripts/generate_sounds.py
+```
+
+`generate_sounds.py` 会自动调用外部采样脚本；重新拉取或强制刷新采样时可使用 `--force`。
+
 ## 操作
 
 - 左键：使用当前工具
