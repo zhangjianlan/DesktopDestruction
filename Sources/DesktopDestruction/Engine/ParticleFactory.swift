@@ -300,20 +300,55 @@ enum ParticleFactory {
 
     static func sawSparks(at point: CGPoint, direction: CGPoint, in canvas: DestructionCanvas) -> CAEmitterLayer {
         let emitter = streamEmitter(at: point)
-        let cell = CAEmitterCell()
-        cell.contents = ArtAssets.image(named: "effect-spark")
-        cell.scale = CGFloat(0.035)
-        cell.scaleRange = CGFloat(0.015)
-        cell.birthRate = 68
-        cell.lifetime = 0.28
-        cell.velocity = 250
-        cell.velocityRange = 80
-        cell.emissionLongitude = emissionAngle(direction) + .pi
-        cell.emissionRange = 1.0
-        cell.yAcceleration = -620
-        cell.color = CGColor(red: 1, green: 1, blue: 1, alpha: 0.9)
-        cell.alphaSpeed = -2.4
-        emitter.emitterCells = [cell]
+
+        let backward = emissionAngle(direction) + .pi
+        let chips = CAEmitterCell()
+        chips.contents = ArtAssets.image(named: "effect-debris")
+        chips.scale = CGFloat(0.042)
+        chips.scaleRange = CGFloat(0.018)
+        chips.birthRate = 62
+        chips.lifetime = 0.46
+        chips.lifetimeRange = 0.16
+        chips.velocity = 335
+        chips.velocityRange = 105
+        chips.emissionLongitude = backward
+        chips.emissionRange = 0.58
+        chips.yAcceleration = -880
+        chips.spin = CGFloat.random(in: -16...16)
+        chips.spinRange = 10
+        chips.color = CGColor(red: 1, green: 0.72, blue: 0.34, alpha: 0.95)
+        chips.alphaSpeed = -1.2
+
+        let sparks = CAEmitterCell()
+        sparks.contents = ArtAssets.image(named: "effect-spark")
+        sparks.scale = CGFloat(0.026)
+        sparks.scaleRange = CGFloat(0.012)
+        sparks.birthRate = 44
+        sparks.lifetime = 0.2
+        sparks.lifetimeRange = 0.08
+        sparks.velocity = 535
+        sparks.velocityRange = 155
+        sparks.emissionLongitude = backward
+        sparks.emissionRange = 0.36
+        sparks.yAcceleration = -980
+        sparks.color = CGColor(red: 1, green: 0.78, blue: 0.32, alpha: 1)
+        sparks.alphaSpeed = -3.1
+
+        let smoke = CAEmitterCell()
+        smoke.contents = ArtAssets.image(named: "effect-smoke")
+        smoke.scale = CGFloat(0.055)
+        smoke.scaleSpeed = CGFloat(0.75)
+        smoke.birthRate = 16
+        smoke.lifetime = 0.52
+        smoke.velocity = 95
+        smoke.velocityRange = 30
+        smoke.emissionLongitude = backward
+        smoke.emissionRange = 0.5
+        smoke.yAcceleration = -145
+        smoke.color = CGColor(red: 0.88, green: 0.84, blue: 0.78, alpha: 0.34)
+        smoke.alphaSpeed = -0.62
+
+        emitter.emitterCells = [chips, sparks, smoke]
         canvas.addTransient(emitter)
         return emitter
     }
@@ -462,25 +497,35 @@ enum ParticleFactory {
         canvas.removeAfter(emitter, delay: 0.95)
     }
 
-    static func sawdust(at point: CGPoint, count: Int, in canvas: DestructionCanvas) {
+    static func sawdust(
+        at point: CGPoint,
+        count: Int,
+        direction: CGPoint? = nil,
+        in canvas: DestructionCanvas
+    ) {
         let scaledCount = max(3, Int(CGFloat(count) * multiplier))
         let emitter = burstEmitter(at: point, life: 0.8)
         emitter.zPosition = 91
         let cell = CAEmitterCell()
         cell.contents = ArtAssets.image(named: "effect-debris")
-        cell.scale = CGFloat(0.06)
-        cell.scaleRange = CGFloat(0.025)
+        cell.scale = CGFloat(0.052)
+        cell.scaleRange = CGFloat(0.022)
         cell.birthRate = Float(scaledCount)
         cell.lifetime = 0.55
         cell.lifetimeRange = 0.2
-        cell.velocity = 150
-        cell.velocityRange = 75
-        cell.emissionRange = 2 * .pi
-        cell.yAcceleration = -620
-        cell.spin = CGFloat.random(in: -9...9)
-        cell.spinRange = 6
-        cell.color = CGColor(red: 1, green: 1, blue: 1, alpha: 0.72)
-        cell.alphaSpeed = -0.9
+        cell.velocity = 270
+        cell.velocityRange = 90
+        if let direction {
+            cell.emissionLongitude = emissionAngle(direction) + .pi
+            cell.emissionRange = 0.72
+        } else {
+            cell.emissionRange = 2 * .pi
+        }
+        cell.yAcceleration = -780
+        cell.spin = CGFloat.random(in: -14...14)
+        cell.spinRange = 9
+        cell.color = CGColor(red: 1, green: 0.74, blue: 0.38, alpha: 0.88)
+        cell.alphaSpeed = -1.05
         emitter.emitterCells = [cell]
         canvas.addTransient(emitter)
         canvas.removeAfter(emitter, delay: 0.85)

@@ -188,17 +188,69 @@ enum DamageRenderer {
         guard let context = makeContext(frame) else { return nil }
         let start = pt(from, in: frame)
         let end = pt(to, in: frame)
-        context.setStrokeColor(rgba(0, 0, 0, 0.55))
-        context.setLineWidth(width)
+
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        let length = max(1, hypot(dx, dy))
+        let unit = CGPoint(x: dx / length, y: dy / length)
+        let normal = CGPoint(x: -unit.y, y: unit.x)
+
         context.setLineCap(.round)
+        context.setStrokeColor(rgba(0.02, 0.02, 0.03, 0.78))
+        context.setLineWidth(width * 0.68)
         context.move(to: start)
         context.addLine(to: end)
         context.strokePath()
-        context.setStrokeColor(rgba(0.78, 0.78, 0.82, 0.2))
-        context.setLineWidth(width * 0.22)
+
+        context.setStrokeColor(rgba(0.12, 0.08, 0.05, 0.42))
+        context.setLineWidth(width)
         context.move(to: start)
         context.addLine(to: end)
         context.strokePath()
+
+        context.setStrokeColor(rgba(0.68, 0.47, 0.24, 0.24))
+        context.setLineWidth(width * 0.2)
+        context.move(to: start)
+        context.addLine(to: end)
+        context.strokePath()
+
+        context.setLineCap(.butt)
+        context.setLineDash(phase: 0, lengths: [2.2, 3.6])
+        context.setStrokeColor(rgba(0.55, 0.52, 0.48, 0.34))
+        context.setLineWidth(max(0.7, width * 0.07))
+        context.move(to: start)
+        context.addLine(to: end)
+        context.strokePath()
+        context.setLineDash(phase: 0, lengths: [])
+
+        for side in [-1.0, 1.0] {
+            let path = CGMutablePath()
+            let step = max(5, length / 9)
+            var distance = 0.0
+            var first = true
+            while distance <= length {
+                let offset = side * width * 0.4 + CGFloat.random(in: -0.9...0.9)
+                let point = CGPoint(
+                    x: start.x + unit.x * CGFloat(distance) + normal.x * offset,
+                    y: start.y + unit.y * CGFloat(distance) + normal.y * offset
+                )
+                if first {
+                    path.move(to: point)
+                    first = false
+                } else {
+                    path.addLine(to: point)
+                }
+                distance += Double(step)
+            }
+            context.addPath(path)
+            context.setStrokeColor(rgba(0.78, 0.72, 0.62, 0.24))
+            context.setLineWidth(1.2)
+            context.strokePath()
+        }
+
+        context.setStrokeColor(rgba(0.82, 0.82, 0.86, 0.16))
+        context.setLineWidth(width * 0.1)
+        context.setLineCap(.round)
         return context.makeImage().map { ($0, frame) }
     }
 

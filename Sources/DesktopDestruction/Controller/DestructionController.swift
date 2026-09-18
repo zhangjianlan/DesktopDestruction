@@ -15,6 +15,7 @@ final class DestructionController {
     private let cursorReticleLayer = CAShapeLayer()
     private let cursorPositionLayer = CATextLayer()
     private let hudLayer = CATextLayer()
+    private let sawLayer = CALayer()
 
     private var currentCursorPoint: CGPoint = .zero
     private var continuousTimer: Timer?
@@ -22,6 +23,8 @@ final class DestructionController {
     private var pendingTasks: [DispatchWorkItem] = []
     private var lastSawPoint: CGPoint?
     private var sawStepCount = 0
+    private var sawDirection = CGPoint(x: 1, y: 0)
+    private var lastSawTickTime = CFAbsoluteTimeGetCurrent()
     private var lastEraseTime: Date?
     private var lastEscapeTime: Date?
     private var burningSpots: [BurningSpot] = []
@@ -84,6 +87,18 @@ final class DestructionController {
         hudLayer.masksToBounds = true
         hudLayer.backgroundColor = CGColor(gray: 0, alpha: 0.68)
         hudLayer.zPosition = 90
+
+        sawLayer.bounds = CGRect(x: 0, y: 0, width: 88, height: 88)
+        sawLayer.contents = SawBladeRenderer.image()
+        sawLayer.contentsGravity = .resizeAspect
+        sawLayer.contentsScale = 2
+        sawLayer.zPosition = 99
+        sawLayer.isHidden = true
+        sawLayer.shadowColor = CGColor(gray: 0, alpha: 1)
+        sawLayer.shadowOpacity = 0.38
+        sawLayer.shadowRadius = 7
+        sawLayer.shadowOffset = CGSize(width: 0, height: 3)
+
         setHUD("🔨 锤子 · 左键使用 · 右键轮盘 · 0 放虫 · A 放动物 · P 放人 · V 放车 · W 放围墙 · E 任意 emoji · R 恢复 · 连按 ESC 退出")
 
         emojiInputPanel.onCommit = { [weak self] options in
@@ -103,6 +118,7 @@ final class DestructionController {
         if let viewLayer = view.layer {
             viewLayer.addSublayer(backgroundLayer)
             viewLayer.addSublayer(canvas.root)
+            viewLayer.addSublayer(sawLayer)
             viewLayer.addSublayer(cursorReticleLayer)
             viewLayer.addSublayer(cursorPositionLayer)
             viewLayer.addSublayer(cursorLayer)
@@ -139,6 +155,9 @@ final class DestructionController {
         currentCursorPoint = point
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        if !sawLayer.isHidden {
+            sawLayer.position = point
+        }
         cursorReticleLayer.position = point
         cursorLayer.position = clampedCursorBadgePoint(for: point)
         updateCursorPositionLabel(at: point)
@@ -373,36 +392,133 @@ final class DestructionController {
     private func startSaw(at point: CGPoint) {
         lastSawPoint = point
         sawStepCount = 0
-        AudioManager.shared.startLoop("saw_loop", gain: 0.74)
+        sawDirection = CGPoint(x: 1, y: 0)
+        lastSawTickTime = CFAbsoluteTimeGetCurrent()
         updateStream(.saw, at: point, direction: CGPoint(x: 1, y: 0))
+        AudioManager.shared.startLoop("saw_loop", gain: 0.60)
+        showSawBlade(at: point)
+        startRepeatingTimer(interval: 0.055) { [weak self] in
+            guard let self, self.toolManager.current == .saw else { return }
+            self.sawTick()
+        }
+        sawTick()
     }
 
     private func dragSaw(to point: CGPoint) {
         let previousPoint = lastSawPoint ?? point
-        updateStream(.saw, at: point, direction: dragDirection(from: previousPoint, to: point))
-        guard let last = lastSawPoint else {
-            lastSawPoint = point
-            return
+        let direction = dragDirection(from: previousPoint, to: point)
+        let length = hypot(direction.x, direction.y)
+        if length > 1 {
+            sawDirection = CGPoint(x: direction.x / length, y: direction.y / length)
         }
-        let dx = point.x - last.x
-        let dy = point.y - last.y
-        guard sqrt(dx * dx + dy * dy) >= 14 else { return }
+        updateStream(.saw, at: point, direction: sawDirection)
+    }
 
-        damageCreatures(
-            at: point,
-            radius: 48,
-            amount: toolManager.current.creatureDamage,
-            source: toolManager.current.creatureDamageSource
-        )
-        if let damage = DamageRenderer.renderCutSegment(from: last, to: point, width: 10) {
-            canvas.addDamage(image: damage.0, frame: damage.1)
+    private func showSawBlade(at point: CGPoint) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        sawLayer.position = point
+        sawLayer.isHidden = false
+        CATransaction.commit()
+
+        let rotation = CABasicAnimation(keyPath: "transform.rotation.z")
+        rotation.fromValue = 0
+        rotation.toValue = -2 * Double.pi
+        rotation.duration = 0.15
+        rotation.repeatCount = .infinity
+        sawLayer.add(rotation, forKey: "DesktopDestruction.sawRotation")
+    }
+
+    private func sawTick() {
+        let now = CFAbsoluteTimeGetCurrent()
+        let interval = max(0.035, min(0.14, now - lastSawTickTime))
+        lastSawTickTime = now
+
+        let point = currentCursorPoint
+        let previous = lastSawPoint ?? point
+        let dx = point.x - previous.x
+        let dy = point.y - previous.y
+        let distance = hypot(dx, dy)
+        if distance > 2 {
+            sawDirection = CGPoint(x: dx / distance, y: dy / distance)
         }
+        updateStream(.saw, at: point, direction: sawDirection)
+
+        let speed = CGFloat(interval > 0 ? distance / interval : 0)
+        let contact = min(1, max(0.16, speed / 1_100))
+        if let cells = activeStreams[.saw]?.emitterCells, cells.count >= 3 {
+            cells[0].birthRate = Float(36 + 48 * contact)
+            cells[1].birthRate = Float(24 + 36 * contact)
+            cells[2].birthRate = Float(8 + 13 * contact)
+        }
+        let cutWidth = 17 + 11 * contact
+        let endpoint = distance < 2
+            ? CGPoint(
+                x: point.x + CGFloat.random(in: -2.6...2.6),
+                y: point.y + CGFloat.random(in: -2.6...2.6)
+            )
+            : point
+
+        var segmentStart = previous
+        let segmentCount = min(5, max(1, Int(ceil(distance / 26))))
+        for index in 1...segmentCount {
+            let progress = CGFloat(index) / CGFloat(segmentCount)
+            let segmentEnd = distance < 2
+                ? endpoint
+                : CGPoint(
+                    x: previous.x + dx * progress,
+                    y: previous.y + dy * progress
+                )
+            if let damage = DamageRenderer.renderCutSegment(
+                from: segmentStart,
+                to: segmentEnd,
+                width: cutWidth
+            ) {
+                canvas.addDamage(image: damage.0, frame: damage.1)
+            }
+            segmentStart = segmentEnd
+        }
+
+        lastSawPoint = endpoint
         sawStepCount += 1
-        ParticleFactory.sawdust(at: point, count: 5, in: canvas)
-        if sawStepCount % 2 == 0 {
-            ParticleFactory.sparks(at: point, count: 9, in: canvas)
+
+        if sawStepCount.isMultiple(of: 2) {
+            damageCreatures(
+                at: point,
+                radius: 46,
+                amount: toolManager.current.creatureDamage * (0.72 + 0.42 * contact),
+                source: toolManager.current.creatureDamageSource
+            )
         }
-        lastSawPoint = point
+
+        ParticleFactory.sawdust(
+            at: endpoint,
+            count: 4 + Int(10 * contact),
+            direction: sawDirection,
+            in: canvas
+        )
+        if sawStepCount.isMultiple(of: 2) {
+            ParticleFactory.sparks(at: endpoint, count: 7 + Int(15 * contact), in: canvas)
+            AudioManager.shared.play(
+                "saw_cut_hit",
+                gain: 0.20 + Float(contact) * 0.20,
+                rate: Float(0.86 + Double(contact) * 0.32),
+                minimumInterval: 0.055
+            )
+        }
+        if sawStepCount.isMultiple(of: 4) {
+            ScreenShake.shake(
+                canvas.root,
+                intensity: 1.8 + 5.0 * contact,
+                duration: 0.04
+            )
+        }
+
+        AudioManager.shared.updateLoop(
+            "saw_loop",
+            gain: Float(0.58 + Double(contact) * 0.24),
+            rate: Float(0.88 + Double(contact) * 0.34)
+        )
     }
 
     private func startWater(at point: CGPoint) {
@@ -1831,6 +1947,9 @@ final class DestructionController {
         continuousTimer?.invalidate()
         continuousTimer = nil
         lastSawPoint = nil
+        sawDirection = CGPoint(x: 1, y: 0)
+        sawLayer.removeAnimation(forKey: "DesktopDestruction.sawRotation")
+        sawLayer.isHidden = true
         AudioManager.shared.stopLoop("saw_loop")
         AudioManager.shared.stopLoop("water_spray")
         AudioManager.shared.stopLoop("flame_loop")

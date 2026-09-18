@@ -51,6 +51,7 @@ final class AudioManager {
                 "flame_loop",
                 "water_spray",
                 "saw_loop",
+                "saw_cut_hit",
                 "nuke_alarm",
                 "nuke_detonation"
             ] {
@@ -103,6 +104,17 @@ final class AudioManager {
     func stopLoop(_ name: String) {
         guard let player = loops.removeValue(forKey: name) else { return }
         fadeOutAndStop(player)
+    }
+
+    func updateLoop(_ name: String, gain: Float, rate: Float) {
+        guard let player = loops[name] else { return }
+        let gain = min(1.0, max(0, gain))
+        playerGains[ObjectIdentifier(player)] = gain
+        player.rate = max(0.25, min(2.0, rate))
+        player.setVolume(
+            min(1, max(0, AppSettings.shared.volume * gain)),
+            fadeDuration: 0.07
+        )
     }
 
     func stopAllLoops() {
@@ -160,6 +172,8 @@ final class AudioManager {
             return 6
         case "flame_loop", "water_spray", "saw_loop":
             return 2
+        case "saw_cut_hit":
+            return 4
         default:
             return 3
         }

@@ -421,20 +421,58 @@ def generate():
         )
         write_wav(f"gun_0{number}", normalize(full_shot, 0.88))
 
-    saw = []
+    saw_rng = random.Random(20260918)
+    saw_motor = []
     motor_state = 0.0
-    for index in range(seconds(0.65)):
+    for index in range(seconds(1.30)):
         time = index / SAMPLE_RATE
-        frequency = 58 + math.sin(2 * math.pi * 4 * time) * 4
-        value = sum(
-            math.sin(2 * math.pi * frequency * harmonic * time) / harmonic
+        motor_frequency = 54 + math.sin(2 * math.pi * 3.1 * time) * 3.5
+        motor = sum(
+            math.sin(2 * math.pi * motor_frequency * harmonic * time) / harmonic
             for harmonic in range(1, 10)
         )
-        raw = rng.uniform(-1, 1)
-        motor_state += (raw - motor_state) / 8.0
-        whine = math.sin(2 * math.pi * 1720 * time) * 0.055
-        saw.append(value * 0.20 + motor_state * 0.14 + whine)
-    write_wav("saw_loop", normalize(loopify(saw), 0.78))
+        raw = saw_rng.uniform(-1, 1)
+        motor_state += (raw - motor_state) / 5.2
+        tooth_load = 0.72 + 0.28 * math.sin(2 * math.pi * 103.0 * time)
+        saw_motor.append(motor * 0.62 + motor_state * 0.24 * tooth_load)
+
+    blade_noise = [saw_rng.uniform(-1, 1) for _ in range(seconds(1.30))]
+    blade_tone = mix(
+        resonator(blade_noise, 1750, 980, 0.34),
+        resonator(blade_noise, 3400, 1750, 0.13),
+        master=0.42,
+    )
+    saw = mix(saw_motor, blade_tone, master=0.74)
+    write_wav("saw_loop", normalize(loopify(saw, 48), 0.72))
+
+    cut_rng = random.Random(20260919)
+    cut_noise = []
+    cut_state = 0.0
+    for index in range(seconds(0.15)):
+        time = index / SAMPLE_RATE
+        raw = cut_rng.uniform(-1, 1)
+        cut_state += (raw - cut_state) / 1.8
+        wood_thump = math.sin(
+            2 * math.pi * (148 + 72 * math.exp(-time * 72.0)) * time
+        ) * math.exp(-time * 36.0)
+        cut_noise.append(cut_state * math.exp(-time * 34.0) + wood_thump * 0.48)
+    cut_resonance = mix(
+        resonator(cut_noise, 780, 860, 0.48),
+        resonator(cut_noise, 2050, 1250, 0.18),
+        master=0.48,
+    )
+    saw_cut = mix(
+        scaled(external["impact_metal_light"], 0.20),
+        cut_noise,
+        delayed(cut_resonance, 0.003),
+        master=0.72,
+    )
+    saw_cut = lowpass(saw_cut, 1.6)
+    write_wav("saw_cut_hit", normalize(saw_cut, 0.58))
+    # Keep the main RNG sequence aligned with the original saw generation so
+    # later sounds do not silently change when saw samples are regenerated.
+    for _ in range(seconds(0.65)):
+        rng.uniform(-1, 1)
 
     water = []
     source = [rng.uniform(-1, 1) for _ in range(seconds(1.05))]

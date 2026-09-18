@@ -12,7 +12,9 @@ final class AudioResourceTests: XCTestCase {
             "explosion",
             "vehicle_explosion",
             "water_spray",
-            "flame_loop"
+            "flame_loop",
+            "saw_loop",
+            "saw_cut_hit"
         ]
 
         for name in names {
