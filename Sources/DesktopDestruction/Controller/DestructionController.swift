@@ -43,6 +43,7 @@ final class DestructionController {
     private var lastPerformanceLog = Date.distantPast
     private var lastPointerPoint: CGPoint = .zero
     private var emojiOptions: [String] = []
+    private var poopProjectiles: [UUID: PoopProjectileAnimator] = [:]
 
     init(view: NSView, background: CGImage, toolbar: ToolbarController) {
         self.view = view
@@ -245,6 +246,7 @@ final class DestructionController {
     func restoreAll() {
         cancelPendingTasks()
         stopContinuous()
+        cancelPoopProjectiles()
         clearActiveEffects()
         let removedCount = canvas.clearDamage()
         canvas.clearTransients()
@@ -744,42 +746,17 @@ final class DestructionController {
     }
 
     private func throwPoop(to target: CGPoint) {
-        let bounds = view.bounds
-        let lateralSwing = min(220, max(130, bounds.width * 0.18))
-        let start = CGPoint(
-            x: min(
-                bounds.maxX - 56,
-                max(bounds.minX + 56, target.x - lateralSwing)
-            ),
-            y: bounds.minY - 68
-        )
-        let distance = hypot(target.x - start.x, target.y - start.y)
-        let diagonal = max(1, hypot(bounds.width, bounds.height))
-        let duration = 0.64 + CGFloat(0.30) * min(1, distance / diagonal)
-        let arcHeight = min(280, max(120, distance * 0.34))
-        let control = CGPoint(
-            x: target.x + lateralSwing * 0.48,
-            y: target.y - arcHeight
-        )
-
-        let path = CGMutablePath()
-        path.move(to: start)
-        path.addQuadCurve(to: target, control: control)
+        let trajectory = PoopThrowTrajectory.make(target: target, bounds: view.bounds)
+        let duration = trajectory.duration
 
         let poop = CALayer()
         poop.contents = ArtAssets.openMoji("💩") ?? IconRenderer.emoji("💩", size: 64)
         poop.contentsGravity = .resizeAspect
         poop.contentsScale = 2
         poop.bounds = CGRect(x: 0, y: 0, width: 62, height: 62)
-        poop.position = target
+        poop.position = trajectory.start
         poop.zPosition = 78
         canvas.addTransient(poop)
-
-        let flight = CAKeyframeAnimation(keyPath: "position")
-        flight.path = path
-        flight.duration = duration
-        flight.timingFunction = CAMediaTimingFunction(name: .linear)
-        poop.add(flight, forKey: "poopFlight")
 
         let spin = CAKeyframeAnimation(keyPath: "transform.rotation.z")
         spin.values = [0, CGFloat.pi * 2]
@@ -804,22 +781,17 @@ final class DestructionController {
             minimumInterval: 0.08
         )
 
-        after(duration) { [weak self] in
+        let projectileID = UUID()
+        let animator = PoopProjectileAnimator(
+            layer: poop,
+            trajectory: trajectory
+        ) { [weak self] in
             guard let self else { return }
-            poop.removeAnimation(forKey: "poopFlight")
-
-            let squashX = CABasicAnimation(keyPath: "transform.scale.x")
-            squashX.fromValue = 1.36
-            squashX.toValue = 1
-            squashX.duration = 0.14
-            poop.add(squashX, forKey: "poopSquashX")
-
-            let squashY = CABasicAnimation(keyPath: "transform.scale.y")
-            squashY.fromValue = 0.62
-            squashY.toValue = 1
-            squashY.duration = 0.14
-            poop.add(squashY, forKey: "poopSquashY")
-
+            self.poopProjectiles[projectileID] = nil
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            poop.removeFromSuperlayer()
+            CATransaction.commit()
             if let splat = DamageRenderer.renderPoopSplat(at: target, radius: 54) {
                 self.canvas.addDamage(image: splat.0, frame: splat.1, permanent: true)
             }
@@ -827,7 +799,13 @@ final class DestructionController {
             AudioManager.shared.play("poop_splat", gain: 1, minimumInterval: 0.03)
             ScreenShake.shake(self.canvas.root, intensity: 5, duration: 0.13)
         }
-        canvas.removeAfter(poop, delay: duration + 0.24)
+        poopProjectiles[projectileID] = animator
+        animator.start()
+    }
+
+    private func cancelPoopProjectiles() {
+        poopProjectiles.values.forEach { $0.cancel() }
+        poopProjectiles.removeAll()
     }
 
     private func eraseAt(_ point: CGPoint) {
